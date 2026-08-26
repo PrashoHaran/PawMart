@@ -1,46 +1,82 @@
 import { useState } from 'react';
-import { Trash2, CreditCard, Lock, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Trash2, CreditCard, Lock, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useCart } from '../context/CartContext';
+import { formatPriceCents } from '../lib/format';
+import QuantityStepper from '../components/QuantityStepper';
+
+const FREE_SHIPPING_THRESHOLD_CENTS = 5000;
+const FLAT_SHIPPING_CENTS = 599;
+const TAX_RATE = 0.08;
+
+const EMPTY_ADDRESS = { firstName: '', lastName: '', address: '', city: '', postalCode: '' };
 
 export default function Cart() {
-  const [items, setItems] = useState([
-    { id: 1, name: 'Premium Dog Food - Salmon Recipe', price: 45.99, quantity: 2, image: 'https://images.unsplash.com/photo-1589924691995-400dc9ecc119?ixlib=rb-1.2.1&auto=format&fit=crop&w=150&q=80' },
-    { id: 2, name: 'Interactive Cat Toy', price: 15.50, quantity: 1, image: 'https://images.unsplash.com/photo-1545249390-6bdfa286032f?ixlib=rb-1.2.1&auto=format&fit=crop&w=150&q=80' }
-  ]);
+  const { items, updateQuantity, removeItem, subtotalCents, checkout } = useCart();
+  const [order, setOrder] = useState(null);
+  const [address, setAddress] = useState(EMPTY_ADDRESS);
+  const [paymentMethod, setPaymentMethod] = useState('credit_card');
+  const [placing, setPlacing] = useState(false);
+  const [error, setError] = useState(null);
 
-  const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-  const tax = subtotal * 0.08;
-  const shipping = subtotal > 50 ? 0 : 5.99;
-  const total = subtotal + tax + shipping;
+  const shippingCents = subtotalCents > FREE_SHIPPING_THRESHOLD_CENTS ? 0 : FLAT_SHIPPING_CENTS;
+  const taxCents = Math.round(subtotalCents * TAX_RATE);
+  const totalCents = subtotalCents + shippingCents + taxCents;
 
-  const updateQuantity = (id, delta) => {
-    setItems(items.map(item => {
-      if (item.id === id) {
-        return { ...item, quantity: Math.max(1, item.quantity + delta) };
-      }
-      return item;
-    }));
+  const updateAddressField = (field) => (e) =>
+    setAddress((prev) => ({ ...prev, [field]: e.target.value }));
+
+  const handlePlaceOrder = async () => {
+    setPlacing(true);
+    setError(null);
+    try {
+      const placedOrder = await checkout(address, paymentMethod);
+      setOrder(placedOrder);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setPlacing(false);
+    }
   };
 
-  const removeItem = (id) => {
-    setItems(items.filter(item => item.id !== id));
-  };
+  if (order) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-12 flex items-center justify-center">
+        <div className="max-w-md mx-auto text-center bg-white rounded-2xl shadow-sm border border-gray-100 p-10">
+          <CheckCircle2 className="h-16 w-16 text-primary mx-auto mb-4" aria-hidden="true" />
+          <h1 className="text-2xl font-heading font-bold text-gray-900 mb-2">Order Placed!</h1>
+          <p className="text-gray-500 mb-6">
+            Thanks for shopping with PawMart. Total charged: ${formatPriceCents(order.totalCents)} (simulated checkout).
+          </p>
+          <Link to="/marketplace" className="btn-primary inline-flex items-center gap-2">
+            Continue Shopping <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
+
         <h1 className="text-3xl font-heading font-bold text-gray-900 mb-8">Secure Checkout</h1>
 
+        {error && (
+          <div className="alert alert-warning mb-8">
+            <p className="text-sm text-orange-700">Couldn't place order: {error.message}</p>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
+
           {/* Main Content - Cart & Shipping Form */}
           <div className="lg:col-span-8 space-y-8">
-            
+
             {/* Cart Items */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4 border-b border-gray-100 pb-4">Order Summary</h2>
-              
+
               {items.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-gray-500 mb-4">Your cart is empty.</p>
@@ -48,21 +84,24 @@ export default function Cart() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {items.map(item => (
-                    <div key={item.id} className="flex gap-4 items-center">
-                      <img src={item.image} alt={item.name} className="w-20 h-20 rounded-lg object-cover border border-gray-200" />
+                  {items.map((item) => (
+                    <div key={item.product._id} className="flex gap-4 items-center">
+                      <img src={item.product.image} alt={item.product.name} className="w-20 h-20 rounded-lg object-cover border border-gray-200" />
                       <div className="flex-grow">
-                        <h3 className="font-semibold text-gray-900 line-clamp-1">{item.name}</h3>
-                        <p className="text-primary font-bold">${item.price.toFixed(2)}</p>
+                        <h3 className="font-semibold text-gray-900 line-clamp-1">{item.product.name}</h3>
+                        <p className="text-primary font-bold">${formatPriceCents(item.product.priceCents)}</p>
                       </div>
                       <div className="flex items-center gap-3">
-                        <div className="flex items-center border border-gray-300 rounded-lg">
-                          <button onClick={() => updateQuantity(item.id, -1)} className="px-3 py-1 hover:bg-gray-50 text-gray-600">-</button>
-                          <span className="px-3 py-1 font-medium text-sm w-8 text-center">{item.quantity}</span>
-                          <button onClick={() => updateQuantity(item.id, 1)} className="px-3 py-1 hover:bg-gray-50 text-gray-600">+</button>
-                        </div>
-                        <button onClick={() => removeItem(item.id)} className="p-2 text-gray-400 hover:text-red-500 transition-colors">
-                          <Trash2 className="h-5 w-5" />
+                        <QuantityStepper
+                          value={item.quantity}
+                          onChange={(next) => updateQuantity(item.product._id, next)}
+                        />
+                        <button
+                          onClick={() => removeItem(item.product._id)}
+                          className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                          aria-label={`Remove ${item.product.name} from cart`}
+                        >
+                          <Trash2 className="h-5 w-5" aria-hidden="true" />
                         </button>
                       </div>
                     </div>
@@ -71,29 +110,29 @@ export default function Cart() {
               )}
             </div>
 
-            {/* Shipping Info Mockup */}
+            {/* Shipping Info */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4 border-b border-gray-100 pb-4">Shipping Information</h2>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-                  <input type="text" className="input-field" placeholder="John" />
+                  <label htmlFor="shipping-first-name" className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                  <input id="shipping-first-name" type="text" className="input-field" placeholder="John" value={address.firstName} onChange={updateAddressField('firstName')} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-                  <input type="text" className="input-field" placeholder="Doe" />
+                  <label htmlFor="shipping-last-name" className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                  <input id="shipping-last-name" type="text" className="input-field" placeholder="Doe" value={address.lastName} onChange={updateAddressField('lastName')} />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-                  <input type="text" className="input-field" placeholder="123 Pet Avenue" />
+                  <label htmlFor="shipping-address" className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                  <input id="shipping-address" type="text" className="input-field" placeholder="123 Pet Avenue" value={address.address} onChange={updateAddressField('address')} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-                  <input type="text" className="input-field" placeholder="Colombo" />
+                  <label htmlFor="shipping-city" className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                  <input id="shipping-city" type="text" className="input-field" placeholder="Colombo" value={address.city} onChange={updateAddressField('city')} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
-                  <input type="text" className="input-field" placeholder="00100" />
+                  <label htmlFor="shipping-postal-code" className="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
+                  <input id="shipping-postal-code" type="text" className="input-field" placeholder="00100" value={address.postalCode} onChange={updateAddressField('postalCode')} />
                 </div>
               </div>
             </div>
@@ -101,42 +140,44 @@ export default function Cart() {
             {/* Payment Info Mockup */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4 border-b border-gray-100 pb-4">Payment Method (Simulated)</h2>
-              
+
               <div className="flex gap-4 mb-6">
-                <label className="flex-1 border-2 border-primary bg-primary/5 rounded-xl p-4 flex items-center justify-between cursor-pointer">
+                <label className={`flex-1 border-2 rounded-xl p-4 flex items-center justify-between cursor-pointer transition-colors ${paymentMethod === 'credit_card' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'}`}>
                   <div className="flex items-center gap-2">
-                    <input type="radio" name="payment" defaultChecked className="text-primary focus:ring-primary h-4 w-4" />
-                    <span className="font-semibold text-primary-dark">Credit Card</span>
+                    <input type="radio" name="payment" checked={paymentMethod === 'credit_card'} onChange={() => setPaymentMethod('credit_card')} className="text-primary focus:ring-primary h-4 w-4" />
+                    <span className={`font-semibold ${paymentMethod === 'credit_card' ? 'text-primary-dark' : 'text-gray-700'}`}>Credit Card</span>
                   </div>
-                  <CreditCard className="h-6 w-6 text-primary" />
+                  <CreditCard className="h-6 w-6 text-primary" aria-hidden="true" />
                 </label>
-                <label className="flex-1 border-2 border-gray-200 hover:border-gray-300 rounded-xl p-4 flex items-center justify-between cursor-pointer transition-colors">
+                <label className={`flex-1 border-2 rounded-xl p-4 flex items-center justify-between cursor-pointer transition-colors ${paymentMethod === 'cash_on_delivery' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'}`}>
                   <div className="flex items-center gap-2">
-                    <input type="radio" name="payment" className="text-primary focus:ring-primary h-4 w-4" />
-                    <span className="font-semibold text-gray-700">Cash on Delivery</span>
+                    <input type="radio" name="payment" checked={paymentMethod === 'cash_on_delivery'} onChange={() => setPaymentMethod('cash_on_delivery')} className="text-primary focus:ring-primary h-4 w-4" />
+                    <span className={`font-semibold ${paymentMethod === 'cash_on_delivery' ? 'text-primary-dark' : 'text-gray-700'}`}>Cash on Delivery</span>
                   </div>
                 </label>
               </div>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Card Number</label>
-                  <div className="relative">
-                    <input type="text" className="input-field pl-10" placeholder="0000 0000 0000 0000" />
-                    <CreditCard className="h-5 w-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+              {paymentMethod === 'credit_card' && (
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="card-number" className="block text-sm font-medium text-gray-700 mb-1">Card Number</label>
+                    <div className="relative">
+                      <input id="card-number" type="text" className="input-field pl-10" placeholder="0000 0000 0000 0000" />
+                      <CreditCard className="h-5 w-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" aria-hidden="true" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="card-expiry" className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
+                      <input id="card-expiry" type="text" className="input-field" placeholder="MM/YY" />
+                    </div>
+                    <div>
+                      <label htmlFor="card-cvc" className="block text-sm font-medium text-gray-700 mb-1">CVC</label>
+                      <input id="card-cvc" type="text" className="input-field" placeholder="123" />
+                    </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
-                    <input type="text" className="input-field" placeholder="MM/YY" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">CVC</label>
-                    <input type="text" className="input-field" placeholder="123" />
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
 
           </div>
@@ -145,32 +186,36 @@ export default function Cart() {
           <div className="lg:col-span-4">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sticky top-24">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Order Total</h2>
-              
+
               <div className="space-y-3 mb-6 text-sm">
                 <div className="flex justify-between text-gray-600">
                   <span>Subtotal</span>
-                  <span className="font-medium text-gray-900">${subtotal.toFixed(2)}</span>
+                  <span className="font-medium text-gray-900">${formatPriceCents(subtotalCents)}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span>Shipping</span>
-                  <span className="font-medium text-gray-900">{shipping === 0 ? 'Free' : `$${shipping.toFixed(2)}`}</span>
+                  <span className="font-medium text-gray-900">{shippingCents === 0 ? 'Free' : `$${formatPriceCents(shippingCents)}`}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span>Estimated Tax</span>
-                  <span className="font-medium text-gray-900">${tax.toFixed(2)}</span>
+                  <span className="font-medium text-gray-900">${formatPriceCents(taxCents)}</span>
                 </div>
                 <div className="border-t border-gray-200 pt-3 flex justify-between items-center mt-2">
                   <span className="text-base font-bold text-gray-900">Total</span>
-                  <span className="text-2xl font-bold text-primary">${total.toFixed(2)}</span>
+                  <span className="text-2xl font-bold text-primary">${formatPriceCents(totalCents)}</span>
                 </div>
               </div>
 
-              <button className="w-full btn-primary py-4 text-lg flex justify-center items-center gap-2 mb-4">
-                Place Order <ArrowRight className="h-5 w-5" />
+              <button
+                onClick={handlePlaceOrder}
+                disabled={items.length === 0 || placing}
+                className="w-full btn-primary py-4 text-lg flex justify-center items-center gap-2 mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {placing ? 'Placing Order...' : 'Place Order'} <ArrowRight className="h-5 w-5" aria-hidden="true" />
               </button>
-              
+
               <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
-                <Lock className="h-4 w-4" /> Secure Checkout (Simulated)
+                <Lock className="h-4 w-4" aria-hidden="true" /> Secure Checkout (Simulated)
               </div>
             </div>
           </div>

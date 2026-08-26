@@ -1,36 +1,76 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Search, Filter, Star, ShoppingCart } from 'lucide-react';
+import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import { apiRequest } from '../lib/api';
+import { formatPriceCents } from '../lib/format';
 
-const DUMMY_PRODUCTS = [
-  { id: 1, name: 'Premium Dog Food - Salmon & Sweet Potato', price: 45.99, rating: 4.8, category: 'Food', image: 'https://images.unsplash.com/photo-1589924691995-400dc9ecc119?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
-  { id: 2, name: 'Interactive Cat Toy - Laser Pointer', price: 15.50, rating: 4.5, category: 'Toys', image: 'https://images.unsplash.com/photo-1545249390-6bdfa286032f?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
-  { id: 3, name: 'Orthopedic Dog Bed - Large', price: 89.99, rating: 4.9, category: 'Accessories', image: 'https://images.unsplash.com/photo-1615266895738-11f1371cd7e5?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
-  { id: 4, name: 'Automatic Pet Water Fountain', price: 34.00, rating: 4.6, category: 'Accessories', image: 'https://images.unsplash.com/photo-1537151608804-ea6f254e4c29?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
-  { id: 5, name: 'Grain-Free Cat Food - Chicken Recipe', price: 28.50, rating: 4.7, category: 'Food', image: 'https://images.unsplash.com/photo-1574542385312-385038c823f6?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
-  { id: 6, name: 'Heavy Duty Dog Leash', price: 18.99, rating: 4.4, category: 'Accessories', image: 'https://images.unsplash.com/photo-1605335158652-3df798eec866?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
-];
+const CATEGORIES = ['All', 'Food', 'Toys', 'Accessories', 'Health', 'Grooming'];
+const SEARCH_DEBOUNCE_MS = 300;
 
 export default function Marketplace() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { addItem } = useCart();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedSearch(searchTerm), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timeout);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+
+    const params = new URLSearchParams({ limit: '50' });
+    if (activeCategory !== 'All') params.set('category', activeCategory);
+    if (debouncedSearch) params.set('search', debouncedSearch);
+
+    apiRequest(`/products?${params.toString()}`, { signal: controller.signal })
+      .then(({ data }) => setProducts(data))
+      .catch((err) => {
+        if (err.name !== 'AbortError') setError(err);
+      })
+      .finally(() => setLoading(false));
+
+    return () => controller.abort();
+  }, [activeCategory, debouncedSearch]);
+
+  const handleAddToCart = (product) => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    addItem(product._id, 1);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
+
         {/* Header & Search */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-heading font-bold text-gray-900">Pet Marketplace</h1>
             <p className="text-gray-600 mt-1">Find the best products for your furry friend.</p>
           </div>
-          
+
           <div className="flex w-full md:w-auto gap-2">
             <div className="relative flex-grow md:w-80">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-5 w-5 text-gray-400" />
+                <Search className="h-5 w-5 text-gray-400" aria-hidden="true" />
               </div>
+              <label htmlFor="marketplace-search" className="sr-only">Search products</label>
               <input
+                id="marketplace-search"
                 type="text"
                 className="input-field pl-10"
                 placeholder="Search products..."
@@ -39,61 +79,79 @@ export default function Marketplace() {
               />
             </div>
             <button className="btn-outline flex items-center gap-2 bg-white">
-              <Filter className="h-5 w-5" />
+              <Filter className="h-5 w-5" aria-hidden="true" />
               <span className="hidden sm:inline">Filter</span>
             </button>
           </div>
         </div>
-        
+
         {/* Categories Bar */}
         <div className="flex gap-4 overflow-x-auto pb-4 mb-8 scrollbar-hide">
-          {['All', 'Food', 'Toys', 'Accessories', 'Health', 'Grooming'].map((cat, idx) => (
-            <button 
-              key={idx}
-              className={`whitespace-nowrap px-6 py-2 rounded-full font-medium transition-colors ${idx === 0 ? 'bg-primary text-white' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}`}
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
+              aria-pressed={activeCategory === cat}
+              className={`whitespace-nowrap px-6 py-2 rounded-full font-medium transition-colors ${activeCategory === cat ? 'bg-primary text-white' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}`}
             >
               {cat}
             </button>
           ))}
         </div>
 
-        {/* Product Grid */}
+        {error && (
+          <div className="alert alert-warning mb-8">
+            <p className="text-sm text-orange-700">Couldn't load products: {error.message}</p>
+          </div>
+        )}
+
+        {loading ? (
+          <p className="text-center text-gray-500 py-12">Loading products...</p>
+        ) : products.length === 0 ? (
+          <p className="text-center text-gray-500 py-12">No products match your search.</p>
+        ) : (
+        /* Product Grid */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          {DUMMY_PRODUCTS.map((product) => (
-            <div key={product.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 group flex flex-col h-full animate-fade-in-up">
-              <Link to={`/product/${product.id}`} className="relative h-64 overflow-hidden block">
-                <img 
-                  src={product.image} 
-                  alt={product.name} 
+          {products.map((product) => (
+            <div key={product._id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 group flex flex-col h-full animate-fade-in-up">
+              <Link to={`/product/${product._id}`} className="relative h-64 overflow-hidden block">
+                <img
+                  src={product.image}
+                  alt={product.name}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
                 <div className="absolute top-3 left-3 bg-white/90 backdrop-blur px-2 py-1 rounded-md text-xs font-semibold text-gray-700">
                   {product.category}
                 </div>
               </Link>
-              
+
               <div className="p-5 flex flex-col flex-grow">
                 <div className="flex items-center gap-1 mb-2">
-                  <Star className="h-4 w-4 fill-secondary text-secondary" />
+                  <Star className="h-4 w-4 fill-secondary text-secondary" aria-hidden="true" />
                   <span className="text-sm font-medium text-gray-700">{product.rating}</span>
                 </div>
-                
-                <Link to={`/product/${product.id}`}>
+
+                <Link to={`/product/${product._id}`}>
                   <h3 className="font-heading font-semibold text-lg text-gray-900 mb-2 line-clamp-2 hover:text-primary transition-colors">
                     {product.name}
                   </h3>
                 </Link>
-                
+
                 <div className="mt-auto pt-4 flex items-center justify-between">
-                  <span className="text-xl font-bold text-gray-900">${product.price.toFixed(2)}</span>
-                  <button className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-colors">
-                    <ShoppingCart className="h-5 w-5" />
+                  <span className="text-xl font-bold text-gray-900">${formatPriceCents(product.priceCents)}</span>
+                  <button
+                    onClick={() => handleAddToCart(product)}
+                    className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-colors"
+                    aria-label={`Add ${product.name} to cart`}
+                  >
+                    <ShoppingCart className="h-5 w-5" aria-hidden="true" />
                   </button>
                 </div>
               </div>
             </div>
           ))}
         </div>
+        )}
 
       </div>
     </div>

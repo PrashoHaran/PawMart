@@ -1,4 +1,12 @@
-import { User, Calendar, ShoppingBag, Heart, Settings, Activity } from 'lucide-react';
+import { Calendar, ShoppingBag, Heart, Settings, Activity } from 'lucide-react';
+
+const SIDEBAR_LINKS = [
+  { icon: Activity, label: 'Overview', current: true },
+  { icon: Heart, label: 'My Pets' },
+  { icon: Calendar, label: 'Appointments' },
+  { icon: ShoppingBag, label: 'Order History' },
+  { icon: Settings, label: 'Settings', spaced: true },
+];
 
 export default function UserDashboard() {
   return (
@@ -18,21 +26,22 @@ export default function UserDashboard() {
           </div>
           
           <nav className="space-y-2">
-            <a href="#" className="flex items-center gap-3 px-4 py-3 bg-primary/10 text-primary rounded-xl font-medium transition-colors">
-              <Activity className="h-5 w-5" /> Overview
-            </a>
-            <a href="#" className="flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-gray-50 rounded-xl font-medium transition-colors">
-              <Heart className="h-5 w-5" /> My Pets
-            </a>
-            <a href="#" className="flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-gray-50 rounded-xl font-medium transition-colors">
-              <Calendar className="h-5 w-5" /> Appointments
-            </a>
-            <a href="#" className="flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-gray-50 rounded-xl font-medium transition-colors">
-              <ShoppingBag className="h-5 w-5" /> Order History
-            </a>
-            <a href="#" className="flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-gray-50 rounded-xl font-medium transition-colors mt-8">
-              <Settings className="h-5 w-5" /> Settings
-            </a>
+            {SIDEBAR_LINKS.map(({ icon: Icon, label, current, spaced }) => (
+              <button
+                key={label}
+                type="button"
+                aria-current={current ? 'page' : undefined}
+                aria-disabled={!current}
+                title={current ? undefined : 'Coming soon'}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${spaced ? 'mt-8' : ''} ${
+                  current
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-gray-600 hover:bg-gray-50 cursor-not-allowed opacity-60'
+                }`}
+              >
+                <Icon className="h-5 w-5" aria-hidden="true" /> {label}
+              </button>
+            ))}
           </nav>
         </div>
       </aside>
@@ -51,7 +60,7 @@ export default function UserDashboard() {
                   <h3 className="text-3xl font-bold text-gray-900">2</h3>
                 </div>
                 <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                  <Heart className="h-6 w-6" />
+                  <Heart className="h-6 w-6" aria-hidden="true" />
                 </div>
               </div>
             </div>
@@ -62,7 +71,7 @@ export default function UserDashboard() {
                   <h3 className="text-3xl font-bold text-gray-900">1</h3>
                 </div>
                 <div className="h-12 w-12 rounded-full bg-secondary/10 flex items-center justify-center text-secondary">
-                  <Calendar className="h-6 w-6" />
+                  <Calendar className="h-6 w-6" aria-hidden="true" />
                 </div>
               </div>
             </div>
@@ -73,7 +82,7 @@ export default function UserDashboard() {
                   <h3 className="text-3xl font-bold text-gray-900">3</h3>
                 </div>
                 <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                  <ShoppingBag className="h-6 w-6" />
+                  <ShoppingBag className="h-6 w-6" aria-hidden="true" />
                 </div>
               </div>
             </div>
@@ -84,15 +93,15 @@ export default function UserDashboard() {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-heading font-semibold text-gray-900">My Pets</h2>
-                <button className="text-primary hover:text-primary-dark text-sm font-medium">Add New</button>
+                <button type="button" aria-disabled="true" title="Coming soon" className="text-gray-400 cursor-not-allowed text-sm font-medium">Add New</button>
               </div>
-              
+
               <div className="space-y-4">
                 {/* Pet Card */}
-                <div className="flex items-center gap-4 p-4 border border-gray-100 rounded-xl hover:shadow-md transition-shadow cursor-pointer">
-                  <img 
-                    src="https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&q=80" 
-                    alt="Bella" 
+                <div className="flex items-center gap-4 p-4 border border-gray-100 rounded-xl">
+                  <img
+                    src="https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&q=80"
+                    alt="Bella"
                     className="w-16 h-16 rounded-full object-cover"
                   />
                   <div>
@@ -100,14 +109,14 @@ export default function UserDashboard() {
                     <p className="text-sm text-gray-500">Golden Retriever • 3 yrs</p>
                   </div>
                   <div className="ml-auto">
-                    <span className="inline-block px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">Healthy</span>
+                    <span className="badge badge-success">Healthy</span>
                   </div>
                 </div>
                 {/* Pet Card */}
-                <div className="flex items-center gap-4 p-4 border border-gray-100 rounded-xl hover:shadow-md transition-shadow cursor-pointer">
-                  <img 
-                    src="https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&q=80" 
-                    alt="Luna" 
+                <div className="flex items-center gap-4 p-4 border border-gray-100 rounded-xl">
+                  <img
+                    src="https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&q=80"
+                    alt="Luna"
                     className="w-16 h-16 rounded-full object-cover"
                   />
                   <div>
@@ -115,19 +124,19 @@ export default function UserDashboard() {
                     <p className="text-sm text-gray-500">Siamese Cat • 2 yrs</p>
                   </div>
                   <div className="ml-auto">
-                    <span className="inline-block px-3 py-1 bg-yellow-100 text-yellow-700 text-xs font-semibold rounded-full">Vaccine Due</span>
+                    <span className="badge badge-warning">Vaccine Due</span>
                   </div>
                 </div>
               </div>
             </div>
-            
+
             {/* Upcoming Appointments */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-heading font-semibold text-gray-900">Upcoming Schedule</h2>
-                <button className="text-primary hover:text-primary-dark text-sm font-medium">Book New</button>
+                <button type="button" aria-disabled="true" title="Coming soon" className="text-gray-400 cursor-not-allowed text-sm font-medium">Book New</button>
               </div>
-              
+
               <div className="space-y-4">
                 <div className="flex gap-4 p-4 border border-gray-100 rounded-xl bg-gray-50/50">
                   <div className="flex flex-col items-center justify-center min-w-[60px] bg-white rounded-lg shadow-sm p-2 text-primary font-bold">
@@ -138,8 +147,8 @@ export default function UserDashboard() {
                     <h4 className="font-bold text-gray-900">Annual Checkup - Luna</h4>
                     <p className="text-sm text-gray-500 mb-2">City Vet Clinic • 10:00 AM</p>
                     <div className="flex items-center gap-2">
-                      <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">Medical</span>
-                      <span className="px-2 py-1 bg-gray-200 text-gray-700 text-xs font-medium rounded">Confirmed</span>
+                      <span className="badge badge-info">Medical</span>
+                      <span className="badge badge-neutral">Confirmed</span>
                     </div>
                   </div>
                 </div>
