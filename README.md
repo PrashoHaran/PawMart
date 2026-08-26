@@ -2,8 +2,6 @@
 
 PawMart is a pet marketplace web app — a one-stop platform for shopping pet products and (eventually) booking pet care services. This repository contains two independent projects: a React frontend and a Node.js/Express backend API backed by MongoDB Atlas.
 
-> For AI coding assistants: see [CLAUDE.md](CLAUDE.md) for a machine-oriented summary of the codebase.
-
 ## Table of Contents
 
 - [Project Status](#project-status)
