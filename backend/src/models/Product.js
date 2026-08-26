@@ -10,6 +10,7 @@ const productSchema = new mongoose.Schema(
     description: { type: String, default: '' },
     features: { type: [String], default: [] },
     vendorName: { type: String, required: true },
+    vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     stock: { type: Number, required: true, min: 0, default: 0 },
   },
   { timestamps: true }
@@ -17,5 +18,6 @@ const productSchema = new mongoose.Schema(
 
 productSchema.index({ category: 1, priceCents: 1 });
 productSchema.index({ name: 'text' });
+productSchema.index({ vendorId: 1 });
 
 export const Product = mongoose.model('Product', productSchema);

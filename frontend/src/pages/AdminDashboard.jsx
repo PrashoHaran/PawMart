@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Users, AlertTriangle, ShieldCheck, Database, Settings, Store, Activity, PieChart } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { apiRequest } from '../lib/api';
 
 const SIDEBAR_LINKS = [
   { icon: Activity, label: 'Platform Health', current: true },
@@ -9,17 +11,61 @@ const SIDEBAR_LINKS = [
   { icon: Settings, label: 'Global Settings', spaced: true },
 ];
 
-const INITIAL_APPLICATIONS = [
-  { id: 1, name: 'City Groomers LLC', type: 'Service Provider', submitted: 'Submitted 2 hours ago' },
-  { id: 2, name: 'Premium Pet Supplies', type: 'Retail Vendor', submitted: 'Submitted 1 day ago' },
-];
-
 export default function AdminDashboard() {
-  const [applications, setApplications] = useState(INITIAL_APPLICATIONS);
+  const { user, token } = useAuth();
+  const [stats, setStats] = useState(null);
+  const [applications, setApplications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const isAdmin = user?.role === 'admin';
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    setLoading(true);
+    Promise.all([
+      apiRequest('/admin/stats', { token }),
+      apiRequest('/vendor-applications', { token }),
+    ])
+      .then(([statsRes, appsRes]) => {
+        setStats(statsRes.data);
+        setApplications(appsRes.data);
+      })
+      .catch((err) => setError(err))
+      .finally(() => setLoading(false));
+  }, [isAdmin, token]);
+
+  const reviewApplication = async (id, action) => {
+    try {
+      await apiRequest(`/vendor-applications/${id}/${action}`, { method: 'POST', token });
+      setApplications((prev) => prev.filter((a) => a._id !== id));
+      setStats((prev) =>
+        prev ? { ...prev, pendingVendorApplications: prev.pendingVendorApplications - 1 } : prev
+      );
+    } catch (err) {
+      setError(err);
+    }
+  };
+
+  if (!user) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] bg-gray-50 flex items-center justify-center p-6">
+        <p className="text-gray-600">Please log in to access the Admin Hub.</p>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] bg-gray-50 flex items-center justify-center p-6">
+        <p className="text-gray-600">Admin access required.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gray-50 flex flex-col md:flex-row">
-      
+
       {/* Sidebar */}
       <aside className="w-full md:w-64 bg-gray-900 text-white hidden md:block">
         <div className="p-6">
@@ -30,7 +76,7 @@ export default function AdminDashboard() {
               <p className="text-xs text-gray-400">System Overview</p>
             </div>
           </div>
-          
+
           <nav className="space-y-2">
             {SIDEBAR_LINKS.map(({ icon: Icon, label, current, spaced }) => (
               <button
@@ -63,28 +109,27 @@ export default function AdminDashboard() {
               </span>
             </div>
           </div>
-          
+
+          {error && (
+            <div className="alert alert-warning mb-8" role="alert">
+              <p className="text-sm text-orange-700">{error.message}</p>
+            </div>
+          )}
+
           {/* Key Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
             <div className="stat-card border-l-4 border-l-primary">
-              <p className="text-gray-500 font-medium mb-1">Total Active Users</p>
-              <h3 className="text-3xl font-bold text-gray-900">12,450</h3>
-              <p className="text-sm text-green-600 mt-2 font-medium">+12% from last month</p>
+              <p className="text-gray-500 font-medium mb-1">Total Users</p>
+              <h3 className="text-3xl font-bold text-gray-900">{loading ? '...' : stats?.totalUsers ?? 0}</h3>
             </div>
             <div className="stat-card border-l-4 border-l-secondary">
               <p className="text-gray-500 font-medium mb-1">Registered Vendors</p>
-              <h3 className="text-3xl font-bold text-gray-900">84</h3>
-              <p className="text-sm text-green-600 mt-2 font-medium">+{applications.length} new applications</p>
+              <h3 className="text-3xl font-bold text-gray-900">{loading ? '...' : stats?.totalVendors ?? 0}</h3>
+              <p className="text-sm text-green-600 mt-2 font-medium">+{applications.length} pending applications</p>
             </div>
             <div className="stat-card border-l-4 border-l-blue-500">
               <p className="text-gray-500 font-medium mb-1">Appointments Booked</p>
-              <h3 className="text-3xl font-bold text-gray-900">342</h3>
-              <p className="text-sm text-gray-500 mt-2 font-medium">This month</p>
-            </div>
-            <div className="stat-card border-l-4 border-l-red-500">
-              <p className="text-gray-500 font-medium mb-1">Reported Issues</p>
-              <h3 className="text-3xl font-bold text-gray-900">2</h3>
-              <p className="text-sm text-red-500 mt-2 font-medium">Needs attention</p>
+              <h3 className="text-3xl font-bold text-gray-900">{loading ? '...' : stats?.totalAppointments ?? 0}</h3>
             </div>
           </div>
 
@@ -96,25 +141,29 @@ export default function AdminDashboard() {
                 <span className="badge bg-secondary text-white">{applications.length} Pending</span>
               </div>
               <div className="p-0">
-                {applications.length === 0 ? (
+                {loading ? (
+                  <p className="p-6 text-center text-gray-500">Loading...</p>
+                ) : applications.length === 0 ? (
                   <p className="p-6 text-center text-gray-500">No pending applications.</p>
                 ) : (
                 <ul className="divide-y divide-gray-100">
                   {applications.map((app) => (
-                  <li key={app.id} className="p-6 hover:bg-gray-50 transition-colors flex items-center justify-between">
+                  <li key={app._id} className="p-6 hover:bg-gray-50 transition-colors flex items-center justify-between">
                     <div>
-                      <h4 className="font-bold text-gray-900">{app.name}</h4>
-                      <p className="text-sm text-gray-500">{app.type} • {app.submitted}</p>
+                      <h4 className="font-bold text-gray-900">{app.businessName}</h4>
+                      <p className="text-sm text-gray-500">
+                        {app.businessType === 'service_provider' ? 'Service Provider' : 'Retail Vendor'} • {app.userId?.name} ({app.userId?.email})
+                      </p>
                     </div>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => setApplications((prev) => prev.filter((a) => a.id !== app.id))}
+                        onClick={() => reviewApplication(app._id, 'approve')}
                         className="px-3 py-1 bg-green-100 text-green-700 rounded font-medium text-sm hover:bg-green-200 transition-colors"
                       >
                         Approve
                       </button>
                       <button
-                        onClick={() => setApplications((prev) => prev.filter((a) => a.id !== app.id))}
+                        onClick={() => reviewApplication(app._id, 'reject')}
                         className="px-3 py-1 bg-red-100 text-red-700 rounded font-medium text-sm hover:bg-red-200 transition-colors"
                       >
                         Reject
