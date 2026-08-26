@@ -1,47 +1,328 @@
 # PawMart Backend
 
-Node.js + Express + MongoDB (Mongoose) API. Phase 1 covers auth, the product catalog, cart, and checkout/orders. Appointments, vendor, and admin endpoints are a later phase.
+REST API for [PawMart](../README.md), a pet marketplace app. Built with Node.js, Express, and MongoDB (via Mongoose), and connects to a MongoDB Atlas cluster.
 
-## Setup
+This is **Phase 1** of the backend: authentication, the product catalog, a per-user cart, and checkout/orders. Appointments, vendor tools, and admin approval endpoints are not implemented yet — those pages on the frontend still run on local mock data.
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Key Features](#key-features)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Setup & Installation](#setup--installation)
+- [Environment Variables](#environment-variables)
+- [Running the Project](#running-the-project)
+- [API Reference](#api-reference)
+- [Data Models](#data-models)
+- [Error Handling](#error-handling)
+- [Security](#security)
+- [Scripts](#scripts)
+- [Deployment Notes](#deployment-notes)
+- [Troubleshooting](#troubleshooting)
+
+## Overview
+
+The backend exposes a JSON REST API under `/api`, backed by MongoDB Atlas. It follows a layered architecture (`routes → controllers → models`) with shared middleware for auth, validation, and error handling. Every response follows a consistent envelope so the frontend (and any other client) can handle success/error cases uniformly.
+
+## Key Features
+
+- **Authentication** — email/password signup and login, JWT-based sessions, bcrypt password hashing
+- **Product catalog** — list with category/search filtering and pagination, fetch by ID
+- **Cart** — per-user, server-persisted cart with add/update/remove operations
+- **Checkout** — atomic stock validation and decrement per item, tax/shipping calculation, order creation, cart clearing
+- **Validation** — every request body/query is validated with [Zod](https://zod.dev) before it reaches a controller
+- **Security baseline** — Helmet security headers, CORS restricted to the frontend origin, rate limiting (tighter on auth routes)
+- **Consistent error handling** — a single error-handling middleware maps Mongo/validation/custom errors to the right HTTP status and a uniform JSON shape
+
+## Tech Stack
+
+| Category | Technology |
+|---|---|
+| Runtime | Node.js (ES Modules) |
+| Framework | [Express](https://expressjs.com/) 4 |
+| Database | MongoDB Atlas |
+| ODM | [Mongoose](https://mongoosejs.com/) 8 |
+| Auth | [jsonwebtoken](https://github.com/auth0/node-jsonwebtoken), [bcryptjs](https://github.com/dcodeIO/bcrypt.js) |
+| Validation | [Zod](https://zod.dev) |
+| Security | [Helmet](https://helmetjs.github.io/), [cors](https://github.com/expressjs/cors), [express-rate-limit](https://github.com/express-rate-limit/express-rate-limit) |
+| Logging | [morgan](https://github.com/expressjs/morgan) |
+| Config | [dotenv](https://github.com/motdotla/dotenv) |
+| Dev tooling | [nodemon](https://nodemon.io/) |
+
+Full dependency list and versions: [package.json](package.json).
+
+## Project Structure
+
+```
+backend/
+├── server.js                  # Entry point: connects DB, starts the HTTP server, handles graceful shutdown
+├── src/
+│   ├── app.js                 # Express app assembly (middleware, routes, error handlers) — no listen()
+│   ├── config/
+│   │   ├── env.js             # Loads and validates required environment variables
+│   │   └── db.js              # Mongoose connection with retry logic and connection event logging
+│   ├── models/                # Mongoose schemas: User, Product, Cart, Order
+│   ├── controllers/           # Route handler logic (one file per resource)
+│   ├── routes/                # Express routers (one file per resource) + routes/index.js mounting them
+│   ├── middleware/
+│   │   ├── auth.js            # requireAuth — verifies JWT and attaches req.user
+│   │   ├── validate.js        # validateBody / validateQuery (Zod) / validateObjectId
+│   │   ├── errorHandler.js    # Centralized error handler + 404 handler
+│   │   └── rateLimiter.js     # apiLimiter (general) and authLimiter (stricter, login/register)
+│   ├── validators/            # Zod schemas, one per resource
+│   ├── utils/
+│   │   ├── ApiError.js        # Typed error class with status/code helpers
+│   │   ├── ApiResponse.js     # sendData() — writes the { data, meta } success envelope
+│   │   └── asyncHandler.js    # Wraps async route handlers so rejected promises reach the error handler
+│   └── scripts/
+│       └── seed.js            # Populates the product catalog with starter data
+├── .env.example                # Template for required environment variables
+└── package.json
+```
+
+## Setup & Installation
+
+**Prerequisites:** Node.js (a recent LTS version is recommended — the project uses ES Modules and modern dependency versions), npm, and a MongoDB Atlas account (free tier is enough).
 
 ```bash
 cd backend
 npm install
-cp .env.example .env   # then fill in MONGODB_URI and JWT_SECRET
-npm run seed            # populates the product catalog
-npm run dev              # starts the server with nodemon
+cp .env.example .env
 ```
 
-## Getting a MongoDB Atlas connection string
+Then fill in `.env` — see [Environment Variables](#environment-variables) below.
 
-1. Create a free account at https://mongodb.com/cloud/atlas.
+### Getting a MongoDB Atlas connection string
+
+If you don't already have an Atlas cluster:
+
+1. Create a free account at [mongodb.com/cloud/atlas](https://mongodb.com/cloud/atlas).
 2. Create a free **M0** cluster.
-3. **Database Access** → add a database user (username/password) — separate from your Atlas login.
-4. **Network Access** → add your IP (or `0.0.0.0/0` for local dev).
-5. **Connect** → **Drivers** → Node.js → copy the connection string, swap in your password, and add a database name, e.g. `.../pawmart?retryWrites=true&w=majority`.
-6. Put it in `backend/.env` as `MONGODB_URI`.
+3. **Database Access** → add a database user (username/password) — this is separate from your Atlas login.
+4. **Network Access** → add your IP address (or `0.0.0.0/0` for local development).
+5. On the cluster, click **Connect** → **Drivers** → **Node.js**, and copy the connection string.
+6. Replace `<password>` with your database user's password, and add a database name after the host, e.g. `.../pawmart?retryWrites=true&w=majority`.
+7. Paste the full string into `.env` as `MONGODB_URI`.
 
-## API
+## Environment Variables
 
-Response envelope: `{ data, meta? }` on success, `{ error: { code, message, details? } }` on failure.
+Defined in [`.env.example`](.env.example). Copy it to `.env` (gitignored) and fill in real values — the server validates that `MONGODB_URI` and `JWT_SECRET` are present at startup and throws immediately if either is missing.
 
-```
-POST   /api/auth/register        { name, email, password }
-POST   /api/auth/login           { email, password }
-GET    /api/auth/me              (auth required)
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `PORT` | No | `5000` | Port the HTTP server listens on |
+| `NODE_ENV` | No | `development` | `development` enables verbose (`dev`-format) request logging; anything else uses `combined` format |
+| `MONGODB_URI` | **Yes** | — | Full MongoDB Atlas connection string, including database name |
+| `JWT_SECRET` | **Yes** | — | Secret used to sign/verify JWTs — use a long random string |
+| `FRONTEND_URL` | No | `http://localhost:5173` | Origin allowed by CORS (the Vite dev server by default) |
 
-GET    /api/products             ?category=&search=&page=&limit=
-GET    /api/products/:id
+## Running the Project
 
-GET    /api/cart                 (auth required)
-POST   /api/cart/items           { productId, quantity }
-PATCH  /api/cart/items/:productId { quantity }
-DELETE /api/cart/items/:productId
-DELETE /api/cart
-
-POST   /api/orders               { shippingAddress, paymentMethod } — checks out the current cart
-GET    /api/orders
-GET    /api/orders/:id
+```bash
+npm run dev      # start with nodemon (auto-restarts on file changes)
+npm run seed      # populate the product catalog (run once, or after wiping the DB)
+npm run start      # start without nodemon (e.g. in production)
 ```
 
-All money fields are integer cents (`priceCents`, `totalCents`, ...) — never floats.
+On successful startup you should see:
+
+```
+[mongo] connected
+[server] listening on port 5000
+```
+
+A health check is available at `GET /health` (returns `{ "data": { "status": "ok" } }`) — useful for verifying the server is up without touching the database-backed routes.
+
+## API Reference
+
+Base path: `/api`. All request/response bodies are JSON.
+
+**Response envelope** — every endpoint responds with one of these two shapes:
+
+```jsonc
+// Success
+{ "data": { /* ... */ }, "meta": { /* optional, e.g. pagination */ } }
+
+// Error
+{ "error": { "code": "VALIDATION_ERROR", "message": "Invalid input", "details": [ /* optional */ ] } }
+```
+
+**Auth** — protected routes expect `Authorization: Bearer <token>`. Money fields (`priceCents`, `subtotalCents`, `totalCents`, etc.) are always **integer cents**, never floats.
+
+### Auth
+
+| Method | Endpoint | Auth | Body | Description |
+|---|---|---|---|---|
+| POST | `/api/auth/register` | No | `{ name, email, password }` | Create an account, returns the user + a JWT |
+| POST | `/api/auth/login` | No | `{ email, password }` | Log in, returns the user + a JWT |
+| GET | `/api/auth/me` | Yes | — | Returns the currently authenticated user |
+
+<details>
+<summary>Example: register</summary>
+
+```bash
+curl -X POST http://localhost:5000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Jane Doe","email":"jane@example.com","password":"secret123"}'
+```
+
+```json
+{
+  "data": {
+    "user": { "_id": "...", "name": "Jane Doe", "email": "jane@example.com", "role": "customer", "tokenVersion": 0, "createdAt": "...", "updatedAt": "..." },
+    "token": "eyJhbGciOi..."
+  }
+}
+```
+</details>
+
+### Products
+
+| Method | Endpoint | Auth | Query/Body | Description |
+|---|---|---|---|---|
+| GET | `/api/products` | No | `?category=&search=&page=&limit=` | List products, paginated |
+| GET | `/api/products/:id` | No | — | Get a single product by ID |
+
+`category` and `search` are optional filters (`search` uses MongoDB text search on the product name). `page` defaults to `1`, `limit` defaults to `20` (max `100`).
+
+<details>
+<summary>Example: list products</summary>
+
+```bash
+curl "http://localhost:5000/api/products?category=Food&limit=10"
+```
+
+```json
+{
+  "data": [ { "_id": "...", "name": "...", "priceCents": 4599, "category": "Food", "stock": 50, "...": "..." } ],
+  "meta": { "page": 1, "per_page": 10, "total": 2 }
+}
+```
+</details>
+
+### Cart
+
+All cart routes require authentication and operate on the logged-in user's own cart.
+
+| Method | Endpoint | Body | Description |
+|---|---|---|---|
+| GET | `/api/cart` | — | Get the current cart (items + subtotal) |
+| POST | `/api/cart/items` | `{ productId, quantity }` | Add an item (merges quantity if already present) |
+| PATCH | `/api/cart/items/:productId` | `{ quantity }` | Set an item's quantity to an absolute value |
+| DELETE | `/api/cart/items/:productId` | — | Remove a single item |
+| DELETE | `/api/cart` | — | Empty the cart |
+
+Every cart response has the same shape:
+
+```json
+{
+  "data": {
+    "items": [
+      { "product": { "_id": "...", "name": "...", "image": "...", "priceCents": 4599, "stock": 50 }, "quantity": 2, "lineTotalCents": 9198 }
+    ],
+    "subtotalCents": 9198
+  }
+}
+```
+
+### Orders
+
+All order routes require authentication.
+
+| Method | Endpoint | Body | Description |
+|---|---|---|---|
+| POST | `/api/orders` | `{ shippingAddress, paymentMethod }` | Check out the current cart — creates an order, decrements stock, clears the cart |
+| GET | `/api/orders` | — | List the current user's orders |
+| GET | `/api/orders/:id` | — | Get a single order (must belong to the current user) |
+
+`paymentMethod` is one of `credit_card` or `cash_on_delivery`. `shippingAddress` requires `firstName`, `lastName`, `address`, `city`, `postalCode`.
+
+Checkout re-validates stock for every cart item and atomically decrements it (`stock >= quantity` guard on the update). If any item is short, already-decremented items from the same request are rolled back and the request fails with `409 CONFLICT` — no partial orders are created.
+
+### Full Endpoint Summary
+
+| Method | Endpoint | Auth Required |
+|---|---|:---:|
+| POST | `/api/auth/register` | ✗ |
+| POST | `/api/auth/login` | ✗ |
+| GET | `/api/auth/me` | ✓ |
+| GET | `/api/products` | ✗ |
+| GET | `/api/products/:id` | ✗ |
+| GET | `/api/cart` | ✓ |
+| POST | `/api/cart/items` | ✓ |
+| PATCH | `/api/cart/items/:productId` | ✓ |
+| DELETE | `/api/cart/items/:productId` | ✓ |
+| DELETE | `/api/cart` | ✓ |
+| POST | `/api/orders` | ✓ |
+| GET | `/api/orders` | ✓ |
+| GET | `/api/orders/:id` | ✓ |
+| GET | `/health` | ✗ |
+
+## Data Models
+
+| Model | Key Fields |
+|---|---|
+| **User** | `name`, `email` (unique), `passwordHash`, `role` (`customer` \| `vendor` \| `admin`, default `customer`), `tokenVersion` |
+| **Product** | `name`, `priceCents`, `rating`, `category`, `image`, `description`, `features[]`, `vendorName`, `stock` |
+| **Cart** | `userId` (unique — one cart per user), `items: [{ product, quantity }]` |
+| **Order** | `userId`, `items: [{ product, name, priceCents, quantity }]` (price snapshot at purchase time), `subtotalCents`, `taxCents`, `shippingCents`, `totalCents`, `status`, `shippingAddress`, `paymentMethod` |
+
+Full field definitions with types, defaults, and indexes are in `src/models/`. Notes:
+
+- Passwords are never returned in API responses (`User.toJSON` strips `passwordHash`).
+- `Order.items` stores a **snapshot** of the product name/price at checkout time — it doesn't change if the product is later edited or deleted.
+- Tax is calculated as 8% of the subtotal; shipping is a flat $5.99 (`599` cents) unless the subtotal exceeds $50 (`5000` cents), in which case it's free.
+
+## Error Handling
+
+All errors — thrown `ApiError`s, Mongoose validation errors, invalid ObjectId `CastError`s, and MongoDB duplicate-key (`11000`) errors — are caught by a single middleware (`src/middleware/errorHandler.js`) and normalized into the `{ error: { code, message, details? } }` shape with the right HTTP status:
+
+| Status | Code | Typical Cause |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | Zod validation failure, invalid ObjectId, Mongoose validation error |
+| 401 | `UNAUTHORIZED` | Missing/invalid/expired token |
+| 403 | `FORBIDDEN` | (reserved for future role-based checks) |
+| 404 | `NOT_FOUND` | Resource not found, or an unmatched route |
+| 409 | `CONFLICT` | Duplicate email on register, insufficient stock at checkout |
+| 429 | `RATE_LIMITED` | Too many requests |
+| 500 | `INTERNAL_ERROR` | Unhandled server error |
+
+## Security
+
+- Passwords hashed with bcrypt (`bcryptjs`, 10 salt rounds)
+- JWTs signed with `JWT_SECRET`, 1-day expiry; each carries a `tokenVersion` claim checked against the user record, so bumping a user's `tokenVersion` invalidates all their existing tokens
+- `helmet()` sets standard security headers
+- CORS locked to a single configured origin (`FRONTEND_URL`)
+- Rate limiting: 300 requests / 15 min on `/api/*` generally, 20 requests / 15 min on auth routes specifically
+- All mutating routes validate their input with Zod before touching the database
+- Route params expected to be Mongo ObjectIds are validated before use, avoiding raw driver errors leaking as 500s
+
+## Scripts
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Start the server with `nodemon` (auto-restart on changes) |
+| `npm run start` | Start the server directly with `node` |
+| `npm run seed` | Wipe and repopulate the `Product` collection with starter catalog data |
+
+## Deployment Notes
+
+There is no deployment configuration (Dockerfile, CI/CD, hosting-specific config) in this repo yet — the project has been run locally against MongoDB Atlas only. If deploying:
+
+- Set `MONGODB_URI`, `JWT_SECRET`, and `FRONTEND_URL` (pointing at the deployed frontend origin) as real environment variables on the host — never commit `.env`.
+- Use `npm run start` (not `dev`) in production.
+- Atlas's **Network Access** list must allow the deployment host's outbound IP (or `0.0.0.0/0`, with the tradeoffs that implies).
+- `NODE_ENV=production` switches request logging to the more compact `combined` format.
+
+## Troubleshooting
+
+| Problem | Likely Cause / Fix |
+|---|---|
+| Server exits immediately with `Missing required environment variable` | `.env` wasn't created, or is missing `MONGODB_URI`/`JWT_SECRET` — see [Environment Variables](#environment-variables) |
+| `querySrv ENOTFOUND ...mongodb.net` on startup | Usually a transient DNS hiccup right after creating a new Atlas cluster; the connection logic retries automatically (up to 5 attempts) — if it persists, double-check the cluster hostname in `MONGODB_URI` |
+| `MongoServerError: bad auth` | Wrong database user/password in `MONGODB_URI` — note this is the **database user** created under Atlas's Database Access, not your Atlas account login |
+| Connection hangs / times out | Your current IP isn't in Atlas's Network Access list |
+| `401 Unauthorized` on a route you just logged in for | Token wasn't sent (`Authorization: Bearer <token>` header), has expired (1-day lifetime), or the user's `tokenVersion` changed since the token was issued |
+| CORS error in the browser console | `FRONTEND_URL` in `.env` doesn't match the origin the frontend is actually running on |
+| `409 CONFLICT` on checkout | A cart item's quantity exceeds current stock — re-fetch the cart/product to see live stock |
