@@ -1,6 +1,6 @@
 # Interim Progress Report (CA 02)
 
-**Group:** Group_01
+**Group:** Group_17
 **Project:** PawMart – A One-Stop Web Marketplace for Pet Products and Pet Care Services
 **Team:** V. Prashoharan, Bashini Rashmika Vindyani, J.P. Inuka Sithanja Jayasinghe, D.S.N. Vitharana, B.R.G.S. Sandaruwan
 
