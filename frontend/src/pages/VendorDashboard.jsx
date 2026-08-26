@@ -138,7 +138,7 @@ export default function VendorDashboard() {
                     <tr key={product.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <img src={product.image} alt={product.name} className="w-10 h-10 rounded object-cover" />
+                          <img src={product.image} alt={product.name} loading="lazy" className="w-10 h-10 rounded object-cover" />
                           <div>
                             <p className="font-medium text-gray-900">{product.name}</p>
                             <p className="text-xs text-gray-500">{product.category}</p>

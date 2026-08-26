@@ -3,6 +3,7 @@ import { Trash2, CreditCard, Lock, ArrowRight, CheckCircle2 } from 'lucide-react
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { formatPriceCents } from '../lib/format';
+import { handleImageError } from '../lib/image';
 import QuantityStepper from '../components/QuantityStepper';
 
 const FREE_SHIPPING_THRESHOLD_CENTS = 5000;
@@ -63,7 +64,7 @@ export default function Cart() {
         <h1 className="text-3xl font-heading font-bold text-gray-900 mb-8">Secure Checkout</h1>
 
         {error && (
-          <div className="alert alert-warning mb-8">
+          <div className="alert alert-warning mb-8" role="alert">
             <p className="text-sm text-orange-700">Couldn't place order: {error.message}</p>
           </div>
         )}
@@ -86,7 +87,7 @@ export default function Cart() {
                 <div className="space-y-6">
                   {items.map((item) => (
                     <div key={item.product._id} className="flex gap-4 items-center">
-                      <img src={item.product.image} alt={item.product.name} className="w-20 h-20 rounded-lg object-cover border border-gray-200" />
+                      <img src={item.product.image} alt={item.product.name} onError={handleImageError} className="w-20 h-20 rounded-lg object-cover border border-gray-200" />
                       <div className="flex-grow">
                         <h3 className="font-semibold text-gray-900 line-clamp-1">{item.product.name}</h3>
                         <p className="text-primary font-bold">${formatPriceCents(item.product.priceCents)}</p>
@@ -116,23 +117,23 @@ export default function Cart() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="shipping-first-name" className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-                  <input id="shipping-first-name" type="text" className="input-field" placeholder="John" value={address.firstName} onChange={updateAddressField('firstName')} />
+                  <input id="shipping-first-name" type="text" autoComplete="given-name" className="input-field" placeholder="John" value={address.firstName} onChange={updateAddressField('firstName')} />
                 </div>
                 <div>
                   <label htmlFor="shipping-last-name" className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-                  <input id="shipping-last-name" type="text" className="input-field" placeholder="Doe" value={address.lastName} onChange={updateAddressField('lastName')} />
+                  <input id="shipping-last-name" type="text" autoComplete="family-name" className="input-field" placeholder="Doe" value={address.lastName} onChange={updateAddressField('lastName')} />
                 </div>
                 <div className="col-span-2">
                   <label htmlFor="shipping-address" className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-                  <input id="shipping-address" type="text" className="input-field" placeholder="123 Pet Avenue" value={address.address} onChange={updateAddressField('address')} />
+                  <input id="shipping-address" type="text" autoComplete="street-address" className="input-field" placeholder="123 Pet Avenue" value={address.address} onChange={updateAddressField('address')} />
                 </div>
                 <div>
                   <label htmlFor="shipping-city" className="block text-sm font-medium text-gray-700 mb-1">City</label>
-                  <input id="shipping-city" type="text" className="input-field" placeholder="Colombo" value={address.city} onChange={updateAddressField('city')} />
+                  <input id="shipping-city" type="text" autoComplete="address-level2" className="input-field" placeholder="Colombo" value={address.city} onChange={updateAddressField('city')} />
                 </div>
                 <div>
                   <label htmlFor="shipping-postal-code" className="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
-                  <input id="shipping-postal-code" type="text" className="input-field" placeholder="00100" value={address.postalCode} onChange={updateAddressField('postalCode')} />
+                  <input id="shipping-postal-code" type="text" autoComplete="postal-code" className="input-field" placeholder="00100" value={address.postalCode} onChange={updateAddressField('postalCode')} />
                 </div>
               </div>
             </div>

@@ -48,7 +48,7 @@ export default function SmartAssistant() {
                     <button
                       onClick={() => setPetType('dog')}
                       aria-pressed={petType === 'dog'}
-                      className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-4 transition-all ${petType === 'dog' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-primary/50'}`}
+                      className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-4 transition-colors ${petType === 'dog' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-primary/50'}`}
                     >
                       <span className="text-4xl" aria-hidden="true">🐶</span>
                       <span className="font-bold text-gray-900">Dog</span>
@@ -56,7 +56,7 @@ export default function SmartAssistant() {
                     <button
                       onClick={() => setPetType('cat')}
                       aria-pressed={petType === 'cat'}
-                      className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-4 transition-all ${petType === 'cat' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-primary/50'}`}
+                      className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-4 transition-colors ${petType === 'cat' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-primary/50'}`}
                     >
                       <span className="text-4xl" aria-hidden="true">🐱</span>
                       <span className="font-bold text-gray-900">Cat</span>
@@ -151,7 +151,7 @@ export default function SmartAssistant() {
                       </h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Link to="/product/1" className="border border-gray-200 rounded-xl p-4 flex gap-4 hover:shadow-md transition-shadow">
-                          <img src="https://images.unsplash.com/photo-1589924691995-400dc9ecc119?ixlib=rb-1.2.1&auto=format&fit=crop&w=100&q=80" alt="Dog Food" className="w-16 h-16 rounded-lg object-cover" />
+                          <img src="https://images.unsplash.com/photo-1589924691995-400dc9ecc119?ixlib=rb-1.2.1&auto=format&fit=crop&w=100&q=80" alt="Dog Food" loading="lazy" className="w-16 h-16 rounded-lg object-cover" />
                           <div>
                             <p className="font-bold text-gray-900 text-sm">Premium Salmon Recipe</p>
                             <p className="text-xs text-gray-500 mb-2">High protein, grain-free</p>
@@ -159,7 +159,7 @@ export default function SmartAssistant() {
                           </div>
                         </Link>
                         <Link to="/product/6" className="border border-gray-200 rounded-xl p-4 flex gap-4 hover:shadow-md transition-shadow">
-                          <img src="https://images.unsplash.com/photo-1605335158652-3df798eec866?ixlib=rb-1.2.1&auto=format&fit=crop&w=100&q=80" alt="Vitamins" className="w-16 h-16 rounded-lg object-cover" />
+                          <img src="https://images.unsplash.com/photo-1631669969504-f35518bf96ba?ixlib=rb-1.2.1&auto=format&fit=crop&w=100&q=80" alt="Vitamins" loading="lazy" className="w-16 h-16 rounded-lg object-cover" />
                           <div>
                             <p className="font-bold text-gray-900 text-sm">Joint Health Chews</p>
                             <p className="text-xs text-gray-500 mb-2">Glucosamine supplement</p>

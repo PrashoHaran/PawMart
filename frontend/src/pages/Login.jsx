@@ -59,7 +59,7 @@ export default function Login() {
         </div>
 
         {error && (
-          <div className="alert alert-warning">
+          <div className="alert alert-warning" role="alert">
             <p className="text-sm text-orange-700">{error.message}</p>
           </div>
         )}

@@ -5,6 +5,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../lib/api';
 import { formatPriceCents } from '../lib/format';
+import { handleImageError } from '../lib/image';
 
 const CATEGORIES = ['All', 'Food', 'Toys', 'Accessories', 'Health', 'Grooming'];
 const SEARCH_DEBOUNCE_MS = 300;
@@ -100,7 +101,7 @@ export default function Marketplace() {
         </div>
 
         {error && (
-          <div className="alert alert-warning mb-8">
+          <div className="alert alert-warning mb-8" role="alert">
             <p className="text-sm text-orange-700">Couldn't load products: {error.message}</p>
           </div>
         )}
@@ -113,11 +114,13 @@ export default function Marketplace() {
         /* Product Grid */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           {products.map((product) => (
-            <div key={product._id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 group flex flex-col h-full animate-fade-in-up">
+            <div key={product._id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-xl transition-shadow duration-300 group flex flex-col h-full animate-fade-in-up">
               <Link to={`/product/${product._id}`} className="relative h-64 overflow-hidden block">
                 <img
                   src={product.image}
                   alt={product.name}
+                  loading="lazy"
+                  onError={handleImageError}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
                 <div className="absolute top-3 left-3 bg-white/90 backdrop-blur px-2 py-1 rounded-md text-xs font-semibold text-gray-700">

@@ -102,6 +102,7 @@ export default function UserDashboard() {
                   <img
                     src="https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&q=80"
                     alt="Bella"
+                    loading="lazy"
                     className="w-16 h-16 rounded-full object-cover"
                   />
                   <div>
@@ -117,6 +118,7 @@ export default function UserDashboard() {
                   <img
                     src="https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&q=80"
                     alt="Luna"
+                    loading="lazy"
                     className="w-16 h-16 rounded-full object-cover"
                   />
                   <div>

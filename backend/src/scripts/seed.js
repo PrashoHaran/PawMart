@@ -35,7 +35,7 @@ const PRODUCTS = [
     rating: 4.9,
     category: 'Accessories',
     image:
-      'https://images.unsplash.com/photo-1615266895738-11f1371cd7e5?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
+      'https://images.unsplash.com/photo-1623250930927-64845511b9e9?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
     description: 'Memory foam orthopedic bed for joint support.',
     features: ['Memory foam core', 'Removable washable cover'],
     vendorName: 'ComfyPets',
@@ -47,7 +47,7 @@ const PRODUCTS = [
     rating: 4.6,
     category: 'Accessories',
     image:
-      'https://images.unsplash.com/photo-1537151608804-ea6f254e4c29?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
+      'https://images.unsplash.com/photo-1571131116858-2295ade82a72?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
     description: 'Filtered circulating water fountain for pets.',
     features: ['3L capacity', 'Ultra-quiet pump'],
     vendorName: 'AquaPet',
@@ -59,7 +59,7 @@ const PRODUCTS = [
     rating: 4.7,
     category: 'Food',
     image:
-      'https://images.unsplash.com/photo-1574542385312-385038c823f6?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
+      'https://images.unsplash.com/photo-1596854331442-3cf47265cefb?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
     description: 'Grain-free chicken recipe cat food.',
     features: ['High protein', 'No artificial preservatives'],
     vendorName: 'HealthyPaws Co.',
@@ -71,7 +71,7 @@ const PRODUCTS = [
     rating: 4.4,
     category: 'Accessories',
     image:
-      'https://images.unsplash.com/photo-1605335158652-3df798eec866?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
+      'https://images.unsplash.com/photo-1644416225353-adc117940526?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
     description: 'Durable nylon leash for daily walks.',
     features: ['Reflective stitching', 'Padded handle'],
     vendorName: 'TrailGear',

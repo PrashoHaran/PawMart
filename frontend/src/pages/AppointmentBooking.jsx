@@ -57,7 +57,7 @@ export default function AppointmentBooking() {
                     key={srv.id}
                     onClick={() => setSelectedService(srv.id)}
                     aria-pressed={selectedService === srv.id}
-                    className={`p-4 rounded-xl border-2 text-left transition-all ${selectedService === srv.id ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-300'}`}
+                    className={`p-4 rounded-xl border-2 text-left transition-colors ${selectedService === srv.id ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-300'}`}
                   >
                     <div className="flex items-center gap-3 mb-2">
                       <div className={`p-2 rounded-lg ${srv.bg} ${srv.color}`}>

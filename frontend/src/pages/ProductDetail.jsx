@@ -5,6 +5,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../lib/api';
 import { formatPriceCents } from '../lib/format';
+import { handleImageError } from '../lib/image';
 import QuantityStepper from '../components/QuantityStepper';
 
 export default function ProductDetail() {
@@ -57,7 +58,7 @@ export default function ProductDetail() {
     return (
       <div className="min-h-screen bg-gray-50 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="alert alert-warning mb-8">
+          <div className="alert alert-warning mb-8" role="alert">
             <p className="text-sm text-orange-700">
               {error?.status === 404 ? 'Product not found.' : `Couldn't load product: ${error?.message}`}
             </p>
@@ -86,6 +87,7 @@ export default function ProductDetail() {
               <img
                 src={product.image}
                 alt={product.name}
+                onError={handleImageError}
                 className="max-w-full h-auto rounded-2xl shadow-lg object-cover w-full max-h-[500px]"
               />
             </div>
