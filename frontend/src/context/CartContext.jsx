@@ -51,11 +51,11 @@ export function CartProvider({ children }) {
       setCart(data);
     };
 
-    const checkout = async (shippingAddress, paymentMethod) => {
+    const checkout = async (shippingAddress, paymentMethod, card) => {
       const { data: order } = await apiRequest('/orders', {
         method: 'POST',
         token,
-        body: { shippingAddress, paymentMethod },
+        body: { shippingAddress, paymentMethod, card: paymentMethod === 'credit_card' ? card : undefined },
       });
       setCart(EMPTY_CART);
       return order;

@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Users, AlertTriangle, ShieldCheck, Database, Settings, Store, Activity, PieChart, Mail } from 'lucide-react';
+import { Users, AlertTriangle, ShieldCheck, Database, Settings, Store, Activity, PieChart, Mail, ShoppingBag } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../lib/api';
+import ManageOrdersPanel from '../components/orders/ManageOrdersPanel';
 
+// `id` links switch the main view; links without one aren't built yet.
 const SIDEBAR_LINKS = [
-  { icon: Activity, label: 'Platform Health', current: true },
+  { icon: Activity, label: 'Platform Health', id: 'overview' },
+  { icon: ShoppingBag, label: 'Orders', id: 'orders' },
   { icon: Users, label: 'Manage Users' },
   { icon: Store, label: 'Vendor Verification' },
   { icon: PieChart, label: 'Analytics Reports' },
@@ -19,6 +22,7 @@ export default function AdminDashboard() {
   const [error, setError] = useState(null);
   const [runningReminders, setRunningReminders] = useState(false);
   const [reminderResult, setReminderResult] = useState(null);
+  const [view, setView] = useState('overview');
 
   const isAdmin = user?.role === 'admin';
 
@@ -99,17 +103,20 @@ export default function AdminDashboard() {
           </div>
 
           <nav className="space-y-2">
-            {SIDEBAR_LINKS.map(({ icon: Icon, label, current, spaced }) => (
+            {SIDEBAR_LINKS.map(({ icon: Icon, label, id, spaced }) => (
               <button
                 key={label}
                 type="button"
-                aria-current={current ? 'page' : undefined}
-                aria-disabled={!current}
-                title={current ? undefined : 'Coming soon'}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${spaced ? 'mt-8' : ''} ${
-                  current
+                onClick={id ? () => setView(id) : undefined}
+                aria-current={view === id ? 'page' : undefined}
+                aria-disabled={!id}
+                title={id ? undefined : 'Coming soon'}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-left transition-colors ${spaced ? 'mt-8' : ''} ${
+                  view === id
                     ? 'bg-white/10 text-white'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5 cursor-not-allowed'
+                    : id
+                      ? 'text-gray-400 hover:text-white hover:bg-white/5'
+                      : 'text-gray-400 hover:bg-white/5 cursor-not-allowed opacity-60'
                 }`}
               >
                 <Icon className="h-5 w-5" aria-hidden="true" /> {label}
@@ -122,6 +129,31 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <main className="flex-1 p-6 lg:p-10">
         <div className="max-w-6xl mx-auto">
+          {/* Mobile view switcher (sidebar is hidden on small screens) */}
+          <div className="md:hidden flex gap-2 mb-6">
+            {SIDEBAR_LINKS.filter((l) => l.id).map(({ label, id }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setView(id)}
+                aria-current={view === id ? 'page' : undefined}
+                className={`btn-toggle ${view === id ? 'btn-toggle-active' : ''}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {view === 'orders' ? (
+            <>
+              <h1 className="text-3xl font-heading font-bold text-gray-900 mb-2">Orders</h1>
+              <p className="text-gray-500 mb-8">
+                Fulfil PawMart&apos;s own items, move any order forward, or cancel and refund it.
+              </p>
+              <ManageOrdersPanel mode="admin" />
+            </>
+          ) : (
+          <>
           <div className="flex flex-wrap gap-4 justify-between items-center mb-8">
             <h1 className="text-3xl font-heading font-bold text-gray-900">Platform Overview</h1>
             <div className="flex flex-wrap gap-4 items-center">
@@ -238,6 +270,8 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
+          </>
+          )}
 
         </div>
       </main>

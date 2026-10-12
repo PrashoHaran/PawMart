@@ -142,3 +142,40 @@ export function vaccinationReminderEmail(user, pet, vaccinations, now = Date.now
     text,
   };
 }
+
+const STATUS_COPY = {
+  shipped: { title: 'Your order is on its way', line: 'has shipped and is on its way to you.' },
+  delivered: { title: 'Your order was delivered', line: 'has been delivered. We hope your pet loves it!' },
+  cancelled: { title: 'Your order was cancelled', line: 'has been cancelled.' },
+};
+
+export function orderStatusEmail(user, order, status) {
+  const orderNo = order._id.toString().slice(-6).toUpperCase();
+  const copy = STATUS_COPY[status];
+  const dashboardUrl = `${env.frontendUrl}/dashboard?tab=orders`;
+  const refundLine =
+    status === 'cancelled' && order.paymentMethod === 'credit_card'
+      ? `A refund of ${money(order.totalCents)} has been issued to your card (simulated).`
+      : '';
+
+  const html = layout(
+    copy.title,
+    `<p style="margin:0 0 16px;">Hi ${escapeHtml(user.name)}, your order <strong>#${orderNo}</strong> ${copy.line}</p>
+    <ul style="padding-left:20px;margin:0 0 16px;font-size:14px;">${order.items
+      .map((item) => `<li>${escapeHtml(item.name)} × ${item.quantity}</li>`)
+      .join('')}</ul>
+    ${refundLine ? `<p style="margin:0;font-size:14px;color:#374151;">${refundLine}</p>` : ''}
+    ${button(dashboardUrl, 'Track your order')}`
+  );
+
+  const text = [
+    `Hi ${user.name}, your order #${orderNo} ${copy.line}`,
+    '',
+    ...order.items.map((item) => `- ${item.name} x ${item.quantity}`),
+    ...(refundLine ? ['', refundLine] : []),
+    '',
+    `Track your order: ${dashboardUrl}`,
+  ].join('\n');
+
+  return { subject: `PawMart order #${orderNo}: ${copy.title.toLowerCase()}`, html, text };
+}

@@ -117,6 +117,7 @@ export default function UserDashboard() {
   const [error, setError] = useState(null);
 
   const loadPets = useCallback(() => apiRequest('/pets', { token }).then(({ data }) => setPets(data)), [token]);
+  const loadOrders = useCallback(() => apiRequest('/orders', { token }).then(({ data }) => setOrders(data)), [token]);
   const loadAppointments = useCallback(
     () => apiRequest('/appointments', { token }).then(({ data }) => setAppointments(data)),
     [token]
@@ -124,10 +125,10 @@ export default function UserDashboard() {
 
   useEffect(() => {
     if (!token) return;
-    Promise.all([loadPets(), loadAppointments(), apiRequest('/orders', { token }).then(({ data }) => setOrders(data))])
+    Promise.all([loadPets(), loadAppointments(), loadOrders()])
       .catch((err) => setError(err))
       .finally(() => setLoading(false));
-  }, [token, loadPets, loadAppointments]);
+  }, [token, loadPets, loadAppointments, loadOrders]);
 
   const goTo = (tab, params = {}) => setSearchParams(tab === 'overview' ? {} : { tab, ...params });
   const selectPet = (petId) => goTo('pets', petId ? { pet: petId } : {});
@@ -215,7 +216,7 @@ export default function UserDashboard() {
           ) : activeTab === 'appointments' ? (
             <AppointmentsTab appointments={appointments} onAppointmentsChanged={loadAppointments} />
           ) : activeTab === 'orders' ? (
-            <OrdersTab orders={orders} />
+            <OrdersTab orders={orders} onOrdersChanged={loadOrders} />
           ) : (
             <OverviewTab pets={pets} appointments={appointments} orders={orders} goTo={goTo} onSelectPet={selectPet} />
           )}

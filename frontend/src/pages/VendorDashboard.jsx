@@ -4,12 +4,13 @@ import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../lib/api';
 import { optimizedImage } from '../lib/image';
 import ImageUploadField from '../components/ImageUploadField';
+import ManageOrdersPanel from '../components/orders/ManageOrdersPanel';
 import { formatPriceCents } from '../lib/format';
 
+// `id` links switch the main view; links without one aren't built yet.
 const SIDEBAR_LINKS = [
-  { icon: TrendingUp, label: 'Dashboard', current: true },
-  { icon: Package, label: 'Products' },
-  { icon: DollarSign, label: 'Orders' },
+  { icon: TrendingUp, label: 'Dashboard & Products', id: 'dashboard' },
+  { icon: DollarSign, label: 'Orders', id: 'orders' },
   { icon: Users, label: 'Customers' },
 ];
 
@@ -178,6 +179,7 @@ export default function VendorDashboard() {
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [view, setView] = useState('dashboard');
 
   const refreshVendorData = () => {
     setLoading(true);
@@ -260,17 +262,20 @@ export default function VendorDashboard() {
           </div>
 
           <nav className="space-y-2">
-            {SIDEBAR_LINKS.map(({ icon: Icon, label, current }) => (
+            {SIDEBAR_LINKS.map(({ icon: Icon, label, id }) => (
               <button
                 key={label}
                 type="button"
-                aria-current={current ? 'page' : undefined}
-                aria-disabled={!current}
-                title={current ? undefined : 'Coming soon'}
+                onClick={id ? () => setView(id) : undefined}
+                aria-current={view === id ? 'page' : undefined}
+                aria-disabled={!id}
+                title={id ? undefined : 'Coming soon'}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${
-                  current
+                  view === id
                     ? 'bg-white/10 text-white'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5 cursor-not-allowed'
+                    : id
+                      ? 'text-gray-400 hover:text-white hover:bg-white/5'
+                      : 'text-gray-400 hover:bg-white/5 cursor-not-allowed opacity-60'
                 }`}
               >
                 <Icon className="h-5 w-5" aria-hidden="true" /> {label}
@@ -283,6 +288,28 @@ export default function VendorDashboard() {
       {/* Main Content */}
       <main className="flex-1 p-6 lg:p-10">
         <div className="max-w-6xl mx-auto">
+          {/* Mobile view switcher (sidebar is hidden on small screens) */}
+          <div className="md:hidden flex gap-2 mb-6">
+            {SIDEBAR_LINKS.filter((l) => l.id).map(({ label, id }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setView(id)}
+                aria-current={view === id ? 'page' : undefined}
+                className={`btn-toggle ${view === id ? 'btn-toggle-active' : ''}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {view === 'orders' ? (
+            <>
+              <h1 className="text-3xl font-heading font-bold text-gray-900 mb-8">Orders</h1>
+              <ManageOrdersPanel mode="vendor" onChanged={refreshVendorData} />
+            </>
+          ) : (
+          <>
           <div className="flex justify-between items-center mb-8">
             <h1 className="text-3xl font-heading font-bold text-gray-900">Overview</h1>
             <button
@@ -403,6 +430,8 @@ export default function VendorDashboard() {
               </table>
             </div>
           </div>
+          </>
+          )}
 
         </div>
       </main>
