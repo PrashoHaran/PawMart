@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { optimizedImage } from '../lib/image';
 import { Link } from 'react-router-dom';
 import { Bot, Sparkles, ChevronRight, Activity, Info } from 'lucide-react';
 import { apiRequest } from '../lib/api';
@@ -201,7 +202,7 @@ export default function SmartAssistant() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           {result.recommendedProducts.map((product) => (
                             <Link key={product._id} to={`/product/${product._id}`} className="border border-gray-200 rounded-xl p-4 flex gap-4 hover:shadow-md transition-shadow">
-                              <img src={product.image} alt={product.name} loading="lazy" className="w-16 h-16 rounded-lg object-cover" />
+                              <img src={optimizedImage(product.image, 128)} alt={product.name} loading="lazy" className="w-16 h-16 rounded-lg object-cover" />
                               <div>
                                 <p className="font-bold text-gray-900 text-sm">{product.name}</p>
                                 <p className="text-xs text-gray-500 mb-2">{product.category}</p>

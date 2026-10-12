@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { apiRequest } from '../../lib/api';
 import { toDateInputValue } from '../../lib/format';
 import { SPECIES_LABELS } from './status';
+import ImageUploadField from '../ImageUploadField';
 
 function splitList(value) {
   return value
@@ -24,6 +25,7 @@ export default function PetForm({ pet, onSaved, onCancel }) {
     photoUrl: pet?.photoUrl ?? '',
   });
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
 
   const update = (field) => (e) => setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -99,15 +101,16 @@ export default function PetForm({ pet, onSaved, onCancel }) {
         </label>
         <input id="pet-allergies" className="input-field" placeholder="e.g. Chicken, Grain" value={form.allergies} onChange={update('allergies')} />
       </div>
-      <div>
-        <label htmlFor="pet-photo" className="block text-sm font-medium text-gray-700 mb-1">
-          Photo URL <span className="text-gray-400 font-normal">(optional)</span>
-        </label>
-        <input id="pet-photo" type="url" className="input-field" placeholder="https://..." value={form.photoUrl} onChange={update('photoUrl')} />
-      </div>
+      <ImageUploadField
+        label="Photo (optional)"
+        purpose="pet"
+        value={form.photoUrl}
+        onChange={(url) => setForm((prev) => ({ ...prev, photoUrl: url }))}
+        onUploadingChange={setUploading}
+      />
       {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
       <div className="flex gap-3">
-        <button type="submit" disabled={saving} className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
+        <button type="submit" disabled={saving || uploading} className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
           {saving ? 'Saving...' : pet ? 'Save Changes' : 'Add Pet'}
         </button>
         <button type="button" onClick={onCancel} className="btn-outline">Cancel</button>

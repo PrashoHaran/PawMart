@@ -5,7 +5,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../lib/api';
 import { formatPriceCents } from '../lib/format';
-import { handleImageError } from '../lib/image';
+import { handleImageError, optimizedImage } from '../lib/image';
 
 const CATEGORIES = ['All', 'Food', 'Toys', 'Accessories', 'Health', 'Grooming'];
 const SEARCH_DEBOUNCE_MS = 300;
@@ -117,7 +117,7 @@ export default function Marketplace() {
             <div key={product._id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-xl transition-shadow duration-300 group flex flex-col h-full animate-fade-in-up">
               <Link to={`/product/${product._id}`} className="relative h-64 overflow-hidden block">
                 <img
-                  src={product.image}
+                  src={optimizedImage(product.image, 600)}
                   alt={product.name}
                   loading="lazy"
                   onError={handleImageError}

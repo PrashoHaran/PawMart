@@ -3,14 +3,14 @@ import { ArrowLeft, Heart, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { apiRequest } from '../../lib/api';
 import { formatAge, formatDate } from '../../lib/format';
-import { handleImageError } from '../../lib/image';
+import { handleImageError, optimizedImage } from '../../lib/image';
 import PetForm from './PetForm';
 import PetHealthPanel from './PetHealthPanel';
 import { SPECIES_LABELS, VACCINE_STATUS, petSubtitle } from './status';
 
 export function PetAvatar({ pet, size = 'w-16 h-16' }) {
   if (pet.photoUrl) {
-    return <img src={pet.photoUrl} alt={pet.name} loading="lazy" onError={handleImageError} className={`${size} rounded-full object-cover shrink-0`} />;
+    return <img src={optimizedImage(pet.photoUrl, 200)} alt={pet.name} loading="lazy" onError={handleImageError} className={`${size} rounded-full object-cover shrink-0`} />;
   }
   return (
     <div className={`${size} rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xl shrink-0`} aria-hidden="true">

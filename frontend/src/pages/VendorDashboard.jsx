@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Package, TrendingUp, DollarSign, Users, Plus, Edit2, Trash2, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../lib/api';
+import { optimizedImage } from '../lib/image';
+import ImageUploadField from '../components/ImageUploadField';
 import { formatPriceCents } from '../lib/format';
 
 const SIDEBAR_LINKS = [
@@ -121,6 +123,7 @@ function ApplicationGate({ token }) {
 
 function ProductForm({ initial, onCancel, onSubmit, saving }) {
   const [form, setForm] = useState(initial);
+  const [uploading, setUploading] = useState(false);
 
   const updateField = (field) => (e) => setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
@@ -146,9 +149,16 @@ function ProductForm({ initial, onCancel, onSubmit, saving }) {
             <input required type="number" min="0" placeholder="Stock" className="input-field" value={form.stock} onChange={updateField('stock')} />
           </div>
           <input required placeholder="Category" className="input-field" value={form.category} onChange={updateField('category')} />
-          <input required type="url" placeholder="Image URL" className="input-field" value={form.image} onChange={updateField('image')} />
+          <ImageUploadField
+            label="Product image"
+            purpose="product"
+            required
+            value={form.image}
+            onChange={(url) => setForm((prev) => ({ ...prev, image: url }))}
+            onUploadingChange={setUploading}
+          />
           <textarea placeholder="Description (optional)" className="input-field min-h-[80px]" value={form.description} onChange={updateField('description')} />
-          <button type="submit" disabled={saving} className="btn-primary w-full disabled:opacity-50">
+          <button type="submit" disabled={saving || uploading} className="btn-primary w-full disabled:opacity-50">
             {saving ? 'Saving...' : 'Save Product'}
           </button>
         </form>
@@ -356,7 +366,7 @@ export default function VendorDashboard() {
                     <tr key={product._id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <img src={product.image} alt={product.name} loading="lazy" className="w-10 h-10 rounded object-cover" />
+                          <img src={optimizedImage(product.image, 80)} alt={product.name} loading="lazy" className="w-10 h-10 rounded object-cover" />
                           <div>
                             <p className="font-medium text-gray-900">{product.name}</p>
                             <p className="text-xs text-gray-500">{product.category}</p>

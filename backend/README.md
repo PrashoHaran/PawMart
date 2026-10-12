@@ -116,6 +116,7 @@ Defined in [`.env.example`](.env.example). Copy it to `.env` (gitignored) and fi
 | `MONGODB_URI` | **Yes** | — | Full MongoDB Atlas connection string, including database name |
 | `JWT_SECRET` | **Yes** | — | Secret used to sign/verify JWTs — use a long random string |
 | `FRONTEND_URL` | No | `http://localhost:5173` | Origin allowed by CORS (the Vite dev server by default); also used for links in emails |
+| `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | No | — | Enables image uploads (product images, pet photos). If unset, forms fall back to an image-URL field |
 | `SMTP_HOST` | No | — | SMTP server. **If unset, emails are printed to the console instead of sent** |
 | `SMTP_PORT` | No | `587` | SMTP port |
 | `SMTP_SECURE` | No | `false` | `true` for implicit TLS (port 465); `false` uses STARTTLS on 587 |
@@ -125,6 +126,16 @@ Defined in [`.env.example`](.env.example). Copy it to `.env` (gitignored) and fi
 | `REMINDER_CRON` | No | `0 8 * * *` | Cron expression for the reminder job |
 | `REMINDER_TZ` | No | `Asia/Colombo` | Timezone the cron expression is evaluated in |
 | `REMINDER_DAYS_BEFORE` | No | `7` | Remind about vaccinations due within this many days (overdue ones are always included) |
+
+### Image uploads (Cloudinary)
+
+Uploads go **directly from the browser to Cloudinary** using signed uploads, so files never pass through this server and the API secret never reaches the client:
+
+1. The frontend calls `POST /api/uploads/signature` with `{ "purpose": "product" | "pet" }`. Product images are vendor-only; pet photos are available to any signed-in user.
+2. The server returns a short-lived signature restricted to JPG/PNG/WebP and a fixed folder (`pawmart/products` or `pawmart/pets/<userId>`).
+3. The browser uploads the file to Cloudinary and saves the returned `secure_url` on the product or pet.
+
+`GET /api/uploads/config` tells the frontend whether uploads are enabled. Cloudinary images are displayed with delivery transformations (`c_limit,w_<n>,f_auto,q_auto`) so each view loads a resized, compressed version. The 5 MB size limit is checked in the browser; to enforce it on Cloudinary's side as well, create a signed upload preset with a max file size.
 
 ### Email notifications
 

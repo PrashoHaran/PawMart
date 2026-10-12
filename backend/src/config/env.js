@@ -22,6 +22,12 @@ export const env = {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
+  // Image uploads: when unset, forms fall back to pasting an image URL.
+  cloudinary: {
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    apiSecret: process.env.CLOUDINARY_API_SECRET,
+  },
   emailFrom: process.env.EMAIL_FROM || 'PawMart <no-reply@pawmart.local>',
   reminders: {
     enabled: process.env.REMINDERS_ENABLED !== 'false',

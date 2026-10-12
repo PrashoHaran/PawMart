@@ -14,3 +14,10 @@ export function handleImageError(e) {
   e.currentTarget.onerror = null;
   e.currentTarget.src = FALLBACK_IMAGE;
 }
+
+// Adds Cloudinary delivery transformations (resize, auto format/quality) to
+// Cloudinary URLs; other URLs (e.g. seeded Unsplash images) pass through.
+export function optimizedImage(url, width) {
+  if (!url || !url.includes('res.cloudinary.com/') || !url.includes('/image/upload/')) return url;
+  return url.replace('/image/upload/', `/image/upload/c_limit,w_${width},f_auto,q_auto/`);
+}

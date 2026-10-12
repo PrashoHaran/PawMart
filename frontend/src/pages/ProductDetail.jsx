@@ -5,7 +5,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../lib/api';
 import { formatPriceCents } from '../lib/format';
-import { handleImageError } from '../lib/image';
+import { handleImageError, optimizedImage } from '../lib/image';
 import QuantityStepper from '../components/QuantityStepper';
 import ReviewSection from '../components/ReviewSection';
 
@@ -93,7 +93,7 @@ export default function ProductDetail() {
             {/* Product Image */}
             <div className="p-8 md:p-12 bg-gray-50/50 flex items-center justify-center relative">
               <img
-                src={product.image}
+                src={optimizedImage(product.image, 1000)}
                 alt={product.name}
                 onError={handleImageError}
                 className="max-w-full h-auto rounded-2xl shadow-lg object-cover w-full max-h-[500px]"

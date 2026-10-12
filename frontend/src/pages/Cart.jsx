@@ -3,7 +3,7 @@ import { Trash2, CreditCard, Lock, ArrowRight, CheckCircle2 } from 'lucide-react
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { formatPriceCents } from '../lib/format';
-import { handleImageError } from '../lib/image';
+import { handleImageError, optimizedImage } from '../lib/image';
 import QuantityStepper from '../components/QuantityStepper';
 
 const FREE_SHIPPING_THRESHOLD_CENTS = 5000;
@@ -87,7 +87,7 @@ export default function Cart() {
                 <div className="space-y-6">
                   {items.map((item) => (
                     <div key={item.product._id} className="flex gap-4 items-center">
-                      <img src={item.product.image} alt={item.product.name} onError={handleImageError} className="w-20 h-20 rounded-lg object-cover border border-gray-200" />
+                      <img src={optimizedImage(item.product.image, 160)} alt={item.product.name} onError={handleImageError} className="w-20 h-20 rounded-lg object-cover border border-gray-200" />
                       <div className="flex-grow">
                         <h3 className="font-semibold text-gray-900 line-clamp-1">{item.product.name}</h3>
                         <p className="text-primary font-bold">${formatPriceCents(item.product.priceCents)}</p>

@@ -11,6 +11,7 @@ import appointmentRoutes from './appointment.routes.js';
 import petAssistantRoutes from './petAssistant.routes.js';
 import reviewRoutes from './review.routes.js';
 import petRoutes from './pet.routes.js';
+import uploadRoutes from './upload.routes.js';
 
 const router = Router();
 
@@ -26,5 +27,6 @@ router.use('/appointments', appointmentRoutes);
 router.use('/pet-assistant', petAssistantRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/pets', petRoutes);
+router.use('/uploads', uploadRoutes);
 
 export default router;
