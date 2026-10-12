@@ -1,5 +1,6 @@
 import { Product } from '../models/Product.js';
 import { Order } from '../models/Order.js';
+import { Review } from '../models/Review.js';
 import { ApiError } from '../utils/ApiError.js';
 import { sendData } from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -35,6 +36,7 @@ export const deleteMyProduct = asyncHandler(async (req, res) => {
   if (!product) {
     throw ApiError.notFound('Product not found');
   }
+  await Review.deleteMany({ productId: product._id });
   sendData(res, 200, { deleted: true });
 });
 

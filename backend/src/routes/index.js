@@ -9,6 +9,7 @@ import vendorRoutes from './vendor.routes.js';
 import serviceRoutes from './service.routes.js';
 import appointmentRoutes from './appointment.routes.js';
 import petAssistantRoutes from './petAssistant.routes.js';
+import reviewRoutes from './review.routes.js';
 
 const router = Router();
 
@@ -22,5 +23,6 @@ router.use('/vendor', vendorRoutes);
 router.use('/services', serviceRoutes);
 router.use('/appointments', appointmentRoutes);
 router.use('/pet-assistant', petAssistantRoutes);
+router.use('/reviews', reviewRoutes);
 
 export default router;

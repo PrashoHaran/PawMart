@@ -8,7 +8,6 @@ export const createVendorProductSchema = z.object({
   description: z.string().trim().max(2000).optional(),
   features: z.array(z.string().trim().max(200)).optional(),
   stock: z.coerce.number().int().min(0),
-  rating: z.coerce.number().min(0).max(5).optional(),
 });
 
 export const updateVendorProductSchema = createVendorProductSchema.partial();

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Star, ShoppingCart, ArrowLeft, ShieldCheck, Truck, RotateCcw, Check } from 'lucide-react';
 import { useCart } from '../context/CartContext';
@@ -7,6 +7,7 @@ import { apiRequest } from '../lib/api';
 import { formatPriceCents } from '../lib/format';
 import { handleImageError } from '../lib/image';
 import QuantityStepper from '../components/QuantityStepper';
+import ReviewSection from '../components/ReviewSection';
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -32,6 +33,13 @@ export default function ProductDetail() {
       .finally(() => setLoading(false));
 
     return () => controller.abort();
+  }, [id]);
+
+  // Re-fetch quietly so the rating badge reflects a newly added/removed review.
+  const refreshProduct = useCallback(() => {
+    apiRequest(`/products/${id}`)
+      .then(({ data }) => setProduct(data))
+      .catch(() => {});
   }, [id]);
 
   const handleAddToCart = () => {
@@ -104,6 +112,11 @@ export default function ProductDetail() {
                   <Star className="h-4 w-4 fill-secondary text-secondary" aria-hidden="true" />
                   <span className="text-sm font-bold text-secondary-dark">{product.rating}</span>
                 </div>
+                <a href="#reviews-heading" className="text-sm text-gray-500 hover:text-primary transition-colors">
+                  {product.reviewCount > 0
+                    ? `${product.reviewCount} review${product.reviewCount === 1 ? '' : 's'}`
+                    : 'No reviews yet'}
+                </a>
                 <span className="text-gray-500 text-sm">
                   {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
                 </span>
@@ -160,6 +173,13 @@ export default function ProductDetail() {
             </div>
           </div>
         </div>
+
+        <ReviewSection
+          productId={product._id}
+          rating={product.rating}
+          reviewCount={product.reviewCount ?? 0}
+          onReviewsChanged={refreshProduct}
+        />
       </div>
     </div>
   );
