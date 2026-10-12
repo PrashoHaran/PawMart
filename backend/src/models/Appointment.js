@@ -4,6 +4,7 @@ const appointmentSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     service: { type: mongoose.Schema.Types.ObjectId, ref: 'Service', required: true },
+    petId: { type: mongoose.Schema.Types.ObjectId, ref: 'Pet', default: null },
     petDescription: { type: String, required: true, trim: true },
     scheduledAt: { type: Date, required: true },
     timeSlotLabel: { type: String, required: true },

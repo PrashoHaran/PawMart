@@ -10,6 +10,7 @@ import serviceRoutes from './service.routes.js';
 import appointmentRoutes from './appointment.routes.js';
 import petAssistantRoutes from './petAssistant.routes.js';
 import reviewRoutes from './review.routes.js';
+import petRoutes from './pet.routes.js';
 
 const router = Router();
 
@@ -24,5 +25,6 @@ router.use('/services', serviceRoutes);
 router.use('/appointments', appointmentRoutes);
 router.use('/pet-assistant', petAssistantRoutes);
 router.use('/reviews', reviewRoutes);
+router.use('/pets', petRoutes);
 
 export default router;

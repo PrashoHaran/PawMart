@@ -24,6 +24,8 @@ export default function AppointmentBooking() {
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
   const [petDescription, setPetDescription] = useState('');
+  const [pets, setPets] = useState([]);
+  const [selectedPetId, setSelectedPetId] = useState('');
   const [notes, setNotes] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState(null);
@@ -35,6 +37,19 @@ export default function AppointmentBooking() {
       .catch((err) => setServicesError(err))
       .finally(() => setServicesLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    apiRequest('/pets', { token })
+      .then(({ data }) => setPets(data))
+      .catch(() => setPets([]));
+  }, [token]);
+
+  const handleSelectPet = (petId) => {
+    setSelectedPetId(petId);
+    const pet = pets.find((p) => p._id === petId);
+    setPetDescription(pet ? [pet.name, pet.breed].filter(Boolean).join(' - ') : '');
+  };
 
   const canConfirm = selectedService && selectedDate && selectedTime && petDescription;
 
@@ -53,6 +68,7 @@ export default function AppointmentBooking() {
           serviceId: selectedService,
           date: selectedDate,
           timeSlotLabel: selectedTime,
+          petId: selectedPetId || undefined,
           petDescription,
           notes,
         },
@@ -178,17 +194,37 @@ export default function AppointmentBooking() {
               Pet Details
             </h2>
             <div className="space-y-4">
-              <div>
-                <label htmlFor="appointment-pet" className="block text-sm font-medium text-gray-700 mb-1">Pet Name & Description</label>
-                <input
-                  id="appointment-pet"
-                  type="text"
-                  className="input-field"
-                  placeholder="e.g. Bella - Golden Retriever"
-                  value={petDescription}
-                  onChange={(e) => setPetDescription(e.target.value)}
-                />
-              </div>
+              {pets.length > 0 && (
+                <div>
+                  <label htmlFor="appointment-pet-select" className="block text-sm font-medium text-gray-700 mb-1">Choose one of your pets</label>
+                  <select
+                    id="appointment-pet-select"
+                    className="input-field"
+                    value={selectedPetId}
+                    onChange={(e) => handleSelectPet(e.target.value)}
+                  >
+                    <option value="">Other / not listed</option>
+                    {pets.map((pet) => (
+                      <option key={pet._id} value={pet._id}>
+                        {pet.name}{pet.breed ? ` (${pet.breed})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {!selectedPetId && (
+                <div>
+                  <label htmlFor="appointment-pet" className="block text-sm font-medium text-gray-700 mb-1">Pet Name & Description</label>
+                  <input
+                    id="appointment-pet"
+                    type="text"
+                    className="input-field"
+                    placeholder="e.g. Bella - Golden Retriever"
+                    value={petDescription}
+                    onChange={(e) => setPetDescription(e.target.value)}
+                  />
+                </div>
+              )}
               <div>
                 <label htmlFor="appointment-notes" className="block text-sm font-medium text-gray-700 mb-1">Reason for Visit / Notes</label>
                 <textarea
