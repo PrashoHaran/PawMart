@@ -8,3 +8,10 @@ export function requireRole(...roles) {
     next();
   };
 }
+
+export function requireServiceProvider(req, res, next) {
+  if (req.user.role !== 'vendor' || req.user.businessType !== 'service_provider') {
+    return next(ApiError.forbidden('Only approved service providers can do this'));
+  }
+  next();
+}

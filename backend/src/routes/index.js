@@ -12,6 +12,7 @@ import petAssistantRoutes from './petAssistant.routes.js';
 import reviewRoutes from './review.routes.js';
 import petRoutes from './pet.routes.js';
 import uploadRoutes from './upload.routes.js';
+import providerRoutes from './provider.routes.js';
 
 const router = Router();
 
@@ -28,5 +29,6 @@ router.use('/pet-assistant', petAssistantRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/pets', petRoutes);
 router.use('/uploads', uploadRoutes);
+router.use('/provider', providerRoutes);
 
 export default router;

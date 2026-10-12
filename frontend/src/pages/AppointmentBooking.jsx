@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../lib/api';
 import { formatPriceCents } from '../lib/format';
 
-const TIME_SLOTS = ['09:00 AM', '10:30 AM', '01:00 PM', '02:30 PM', '04:00 PM'];
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const SERVICE_STYLE = {
   vet: { icon: Stethoscope, color: 'text-blue-500', bg: 'bg-blue-100' },
@@ -23,6 +23,8 @@ export default function AppointmentBooking() {
   const [selectedService, setSelectedService] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
+  const [availability, setAvailability] = useState(null);
+  const [availabilityError, setAvailabilityError] = useState(null);
   const [petDescription, setPetDescription] = useState('');
   const [pets, setPets] = useState([]);
   const [selectedPetId, setSelectedPetId] = useState('');
@@ -50,6 +52,34 @@ export default function AppointmentBooking() {
     const pet = pets.find((p) => p._id === petId);
     setPetDescription(pet ? [pet.name, pet.breed].filter(Boolean).join(' - ') : '');
   };
+
+  // Free slots for the chosen service and date.
+  useEffect(() => {
+    if (!selectedService || !selectedDate) return;
+    let active = true;
+    apiRequest(`/services/${selectedService}/availability?date=${selectedDate}`)
+      .then(({ data }) => active && setAvailability(data))
+      .catch((err) => active && setAvailabilityError(err));
+    return () => {
+      active = false;
+    };
+  }, [selectedService, selectedDate]);
+
+  const chooseService = (id) => {
+    setSelectedService(id);
+    setSelectedTime('');
+    setAvailability(null);
+    setAvailabilityError(null);
+  };
+
+  const chooseDate = (date) => {
+    setSelectedDate(date);
+    setSelectedTime('');
+    setAvailability(null);
+    setAvailabilityError(null);
+  };
+
+  const currentService = services.find((s) => s._id === selectedService);
 
   const canConfirm = selectedService && selectedDate && selectedTime && petDescription;
 
@@ -89,7 +119,7 @@ export default function AppointmentBooking() {
           <CheckCircle2 className="h-16 w-16 text-primary mx-auto mb-4" aria-hidden="true" />
           <h1 className="text-2xl font-heading font-bold text-gray-900 mb-2">Appointment Confirmed!</h1>
           <p className="text-gray-500">
-            {service?.name} booked for {selectedDate} at {selectedTime}.
+            {service?.name} with {service?.providerName} is booked for {selectedDate} at {selectedTime}. A confirmation email is on its way.
           </p>
         </div>
       </div>
@@ -128,7 +158,7 @@ export default function AppointmentBooking() {
                   return (
                     <button
                       key={srv._id}
-                      onClick={() => setSelectedService(srv._id)}
+                      onClick={() => chooseService(srv._id)}
                       aria-pressed={selectedService === srv._id}
                       className={`p-4 rounded-xl border-2 text-left transition-colors ${selectedService === srv._id ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-300'}`}
                     >
@@ -139,7 +169,10 @@ export default function AppointmentBooking() {
                         <span className="font-bold text-gray-900">{srv.name}</span>
                       </div>
                       <p className="text-sm text-gray-500 mb-1">{srv.description}</p>
-                      <p className="text-xs text-gray-400">{srv.durationMinutes} min · ${formatPriceCents(srv.priceCents)}</p>
+                      <p className="text-xs text-gray-400">
+                        {srv.providerName} · {srv.durationMinutes} min · ${formatPriceCents(srv.priceCents)}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">{srv.availableDays.map((d) => DAY_NAMES[d]).join(', ')}</p>
                     </button>
                   );
                 })}
@@ -164,25 +197,44 @@ export default function AppointmentBooking() {
                   min={new Date().toISOString().slice(0, 10)}
                   className="input-field"
                   value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
+                  onChange={(e) => chooseDate(e.target.value)}
                 />
               </div>
               <div>
                 <span className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   <Clock className="h-4 w-4 text-gray-400" aria-hidden="true" /> Available Time Slots
                 </span>
-                <div className="flex flex-wrap gap-2">
-                  {TIME_SLOTS.map(time => (
-                    <button
-                      key={time}
-                      onClick={() => setSelectedTime(time)}
-                      aria-pressed={selectedTime === time}
-                      className={`btn-toggle ${selectedTime === time ? 'btn-toggle-active' : ''}`}
-                    >
-                      {time}
-                    </button>
-                  ))}
-                </div>
+                {!selectedService || !selectedDate ? (
+                  <p className="text-sm text-gray-500">Choose a service and date to see open times.</p>
+                ) : availabilityError ? (
+                  <p className="text-sm text-red-600" role="alert">Couldn&apos;t load times: {availabilityError.message}</p>
+                ) : !availability ? (
+                  <p className="text-sm text-gray-500">Checking availability...</p>
+                ) : !availability.open ? (
+                  <p className="text-sm text-gray-500">
+                    {currentService?.providerName} isn&apos;t open on this day. Available:{' '}
+                    {currentService?.availableDays.map((d) => DAY_NAMES[d]).join(', ')}.
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {availability.slots.map(({ label, available, reason }) => (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => setSelectedTime(label)}
+                        disabled={!available}
+                        aria-pressed={selectedTime === label}
+                        title={reason === 'booked' ? 'Already booked' : reason === 'past' ? 'Time has passed' : undefined}
+                        className={`btn-toggle ${selectedTime === label ? 'btn-toggle-active' : ''} disabled:opacity-40 disabled:cursor-not-allowed disabled:line-through`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                    {availability.slots.every((slot) => !slot.available) && (
+                      <p className="text-sm text-gray-500 w-full">No open times left on this day — try another date.</p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>

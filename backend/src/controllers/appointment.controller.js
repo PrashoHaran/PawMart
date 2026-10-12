@@ -1,32 +1,37 @@
 import { Appointment } from '../models/Appointment.js';
 import { Service } from '../models/Service.js';
 import { Pet } from '../models/Pet.js';
+import { User } from '../models/User.js';
+import { sendMail } from '../services/mailer.js';
+import { appointmentBookedEmail, appointmentCancelledEmail } from '../services/emailTemplates.js';
 import { ApiError } from '../utils/ApiError.js';
 import { sendData } from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { parseSlotToDate, serviceSchedule, weekdayOf } from '../utils/appointmentTime.js';
 
-function parseSlotToDate(date, timeSlotLabel) {
-  const match = timeSlotLabel.match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/i);
-  if (!match) return null;
-
-  let [, hours, minutes, meridiem] = match;
-  hours = parseInt(hours, 10);
-  meridiem = meridiem.toUpperCase();
-  if (meridiem === 'PM' && hours !== 12) hours += 12;
-  if (meridiem === 'AM' && hours === 12) hours = 0;
-
-  const scheduledAt = new Date(`${date}T${String(hours).padStart(2, '0')}:${minutes}:00`);
-  return Number.isNaN(scheduledAt.getTime()) ? null : scheduledAt;
-}
+const SERVICE_FIELDS = 'name type durationMinutes priceCents providerId';
 
 export const listMyAppointments = asyncHandler(async (req, res) => {
   const appointments = await Appointment.find({ userId: req.user._id })
-    .populate('service', 'name type durationMinutes priceCents')
+    .populate({ path: 'service', select: SERVICE_FIELDS, populate: { path: 'providerId', select: 'businessName' } })
     .populate('petId', 'name species')
     .sort({ scheduledAt: -1 })
     .lean();
-  sendData(res, 200, appointments);
+
+  const data = appointments.map((a) => ({
+    ...a,
+    service: a.service && {
+      ...a.service,
+      providerId: a.service.providerId?._id ?? null,
+      providerName: a.service.providerId?.businessName ?? 'PawMart Clinic',
+    },
+  }));
+  sendData(res, 200, data);
 });
+
+async function providerOf(service) {
+  return service.providerId ? User.findById(service.providerId, 'name email businessName').lean() : null;
+}
 
 export const createAppointment = asyncHandler(async (req, res) => {
   const { serviceId, date, timeSlotLabel, petId, petDescription, notes } = req.body;
@@ -40,12 +45,28 @@ export const createAppointment = asyncHandler(async (req, res) => {
     throw ApiError.notFound('Pet not found');
   }
 
+  const { timeSlots, availableDays } = serviceSchedule(service);
+  if (!availableDays.includes(weekdayOf(date))) {
+    throw ApiError.badRequest('This service is not available on that day');
+  }
+  if (!timeSlots.includes(timeSlotLabel)) {
+    throw ApiError.badRequest('That time slot is not offered for this service');
+  }
+
   const scheduledAt = parseSlotToDate(date, timeSlotLabel);
   if (!scheduledAt) {
     throw ApiError.badRequest('Invalid date or time slot');
   }
   if (scheduledAt.getTime() < Date.now()) {
     throw ApiError.badRequest('Cannot book an appointment in the past');
+  }
+
+  // A provider can't be double-booked across their different services.
+  if (service.providerId) {
+    const providerServiceIds = await Service.find({ providerId: service.providerId }).distinct('_id');
+    if (await Appointment.exists({ service: { $in: providerServiceIds }, scheduledAt, status: 'booked' })) {
+      throw ApiError.conflict('The provider is already booked at that time');
+    }
   }
 
   let appointment;
@@ -67,6 +88,14 @@ export const createAppointment = asyncHandler(async (req, res) => {
   }
 
   sendData(res, 201, appointment);
+
+  // Fire-and-forget notifications.
+  const provider = await providerOf(service);
+  const providerName = provider?.businessName ?? 'PawMart Clinic';
+  sendMail({ to: req.user.email, ...appointmentBookedEmail({ appointment, service, providerName, customer: req.user, recipient: 'customer' }) });
+  if (provider) {
+    sendMail({ to: provider.email, ...appointmentBookedEmail({ appointment, service, providerName, customer: req.user, recipient: 'provider' }) });
+  }
 });
 
 export const cancelAppointment = asyncHandler(async (req, res) => {
@@ -74,14 +103,24 @@ export const cancelAppointment = asyncHandler(async (req, res) => {
   if (!appointment) {
     throw ApiError.notFound('Appointment not found');
   }
-  if (appointment.status === 'cancelled') {
-    throw ApiError.conflict('Appointment is already cancelled');
+  if (appointment.status !== 'booked') {
+    throw ApiError.conflict(`Appointment is already ${appointment.status.replace('_', ' ')}`);
   }
   if (appointment.scheduledAt.getTime() < Date.now()) {
     throw ApiError.badRequest('Past appointments cannot be cancelled');
   }
 
   appointment.status = 'cancelled';
+  appointment.cancelledBy = 'customer';
   await appointment.save();
   sendData(res, 200, appointment);
+
+  const service = await Service.findById(appointment.service).lean();
+  const provider = service && (await providerOf(service));
+  if (provider) {
+    sendMail({
+      to: provider.email,
+      ...appointmentCancelledEmail({ appointment, service, customer: req.user, recipient: 'provider', providerName: provider.businessName }),
+    });
+  }
 });

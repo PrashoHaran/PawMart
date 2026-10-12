@@ -60,6 +60,7 @@ export const approveVendorApplication = asyncHandler(async (req, res) => {
     {
       role: 'vendor',
       businessName: application.businessName,
+      businessType: application.businessType,
       $inc: { tokenVersion: 1 },
     }
   );

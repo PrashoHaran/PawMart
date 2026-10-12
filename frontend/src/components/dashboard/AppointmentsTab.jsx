@@ -12,12 +12,12 @@ export function AppointmentItem({ appointment, onCancel }) {
   const when = new Date(appointment.scheduledAt);
   const upcoming = isUpcoming(appointment);
   const petName = appointment.petId?.name;
-  const statusBadge =
-    appointment.status === 'cancelled'
-      ? { label: 'Cancelled', className: 'badge-danger' }
-      : upcoming
-        ? { label: 'Confirmed', className: 'badge-success' }
-        : { label: 'Completed', className: 'badge-neutral' };
+  const statusBadge = {
+    cancelled: { label: appointment.cancelledBy === 'provider' ? 'Cancelled by provider' : 'Cancelled', className: 'badge-danger' },
+    completed: { label: 'Completed', className: 'badge-success' },
+    no_show: { label: 'Missed', className: 'badge-warning' },
+    booked: upcoming ? { label: 'Confirmed', className: 'badge-success' } : { label: 'Awaiting update', className: 'badge-neutral' },
+  }[appointment.status];
 
   return (
     <li className={`flex gap-4 p-4 border border-gray-100 rounded-xl bg-gray-50/50 ${appointment.status === 'cancelled' ? 'opacity-60' : ''}`}>
@@ -31,6 +31,7 @@ export function AppointmentItem({ appointment, onCancel }) {
         </h4>
         <p className="text-sm text-gray-500 mb-2">
           {when.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric' })} • {appointment.timeSlotLabel}
+          {appointment.service?.providerName && ` • ${appointment.service.providerName}`}
           {appointment.service && ` • $${formatPriceCents(appointment.service.priceCents)}`}
         </p>
         <div className="flex flex-wrap items-center gap-2">
@@ -38,6 +39,7 @@ export function AppointmentItem({ appointment, onCancel }) {
           <span className={`badge ${statusBadge.className}`}>{statusBadge.label}</span>
         </div>
         {appointment.notes && <p className="text-sm text-gray-600 mt-2">{appointment.notes}</p>}
+        {appointment.cancelReason && <p className="text-sm text-red-600 mt-2">Reason: {appointment.cancelReason}</p>}
       </div>
       {upcoming && onCancel && (
         <button type="button" onClick={() => onCancel(appointment)} className="self-start text-sm font-medium text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors">

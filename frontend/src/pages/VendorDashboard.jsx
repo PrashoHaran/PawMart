@@ -5,6 +5,7 @@ import { apiRequest } from '../lib/api';
 import { optimizedImage } from '../lib/image';
 import ImageUploadField from '../components/ImageUploadField';
 import ManageOrdersPanel from '../components/orders/ManageOrdersPanel';
+import ProviderDashboard from '../components/provider/ProviderDashboard';
 import { formatPriceCents } from '../lib/format';
 
 // `id` links switch the main view; links without one aren't built yet.
@@ -171,6 +172,7 @@ function ProductForm({ initial, onCancel, onSubmit, saving }) {
 export default function VendorDashboard() {
   const { user, token } = useAuth();
   const isVendor = user?.role === 'vendor';
+  const isProvider = isVendor && user.businessType === 'service_provider';
 
   const [products, setProducts] = useState([]);
   const [stats, setStats] = useState(null);
@@ -193,10 +195,10 @@ export default function VendorDashboard() {
   };
 
   useEffect(() => {
-    if (!isVendor) return;
+    if (!isVendor || isProvider) return;
     refreshVendorData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isVendor]);
+  }, [isVendor, isProvider]);
 
   const submitProductForm = async (form) => {
     setSaving(true);
@@ -248,6 +250,10 @@ export default function VendorDashboard() {
         <ApplicationGate token={token} />
       </div>
     );
+  }
+
+  if (isProvider) {
+    return <ProviderDashboard />;
   }
 
   return (

@@ -5,6 +5,7 @@ import { User } from '../models/User.js';
 import { ApiError } from '../utils/ApiError.js';
 import { sendData } from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { ensureBusinessType } from '../utils/businessType.js';
 
 function issueToken(user) {
   return jwt.sign({ sub: user._id.toString(), tokenVersion: user.tokenVersion }, env.jwtSecret, {
@@ -39,6 +40,7 @@ export const login = asyncHandler(async (req, res) => {
     throw ApiError.unauthorized('Invalid email or password');
   }
 
+  await ensureBusinessType(user);
   sendData(res, 200, { user, token: issueToken(user) });
 });
 

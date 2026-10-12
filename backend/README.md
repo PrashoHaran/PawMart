@@ -116,6 +116,7 @@ Defined in [`.env.example`](.env.example). Copy it to `.env` (gitignored) and fi
 | `MONGODB_URI` | **Yes** | — | Full MongoDB Atlas connection string, including database name |
 | `JWT_SECRET` | **Yes** | — | Secret used to sign/verify JWTs — use a long random string |
 | `FRONTEND_URL` | No | `http://localhost:5173` | Origin allowed by CORS (the Vite dev server by default); also used for links in emails |
+| `APP_UTC_OFFSET` | No | `+05:30` | Timezone offset appointment time slots are interpreted in, independent of the server's own timezone |
 | `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | No | — | Enables image uploads (product images, pet photos). If unset, forms fall back to an image-URL field |
 | `SMTP_HOST` | No | — | SMTP server. **If unset, emails are printed to the console instead of sent** |
 | `SMTP_PORT` | No | `587` | SMTP port |

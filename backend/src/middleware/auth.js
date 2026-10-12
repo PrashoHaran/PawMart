@@ -3,6 +3,7 @@ import { env } from '../config/env.js';
 import { ApiError } from '../utils/ApiError.js';
 import { User } from '../models/User.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { ensureBusinessType } from '../utils/businessType.js';
 
 export const requireAuth = asyncHandler(async (req, res, next) => {
   const header = req.headers.authorization || '';
@@ -24,6 +25,6 @@ export const requireAuth = asyncHandler(async (req, res, next) => {
     throw ApiError.unauthorized('Session no longer valid');
   }
 
-  req.user = user;
+  req.user = await ensureBusinessType(user);
   next();
 });

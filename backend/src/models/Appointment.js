@@ -9,7 +9,11 @@ const appointmentSchema = new mongoose.Schema(
     scheduledAt: { type: Date, required: true },
     timeSlotLabel: { type: String, required: true },
     notes: { type: String, default: '' },
-    status: { type: String, enum: ['booked', 'cancelled'], default: 'booked' },
+    // "booked" is an active booking; completed / no_show are set by the
+    // provider after the visit time.
+    status: { type: String, enum: ['booked', 'cancelled', 'completed', 'no_show'], default: 'booked' },
+    cancelledBy: { type: String, enum: ['customer', 'provider', 'admin'], default: undefined },
+    cancelReason: { type: String, default: '' },
   },
   { timestamps: true }
 );

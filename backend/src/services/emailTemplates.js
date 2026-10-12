@@ -179,3 +179,67 @@ export function orderStatusEmail(user, order, status) {
 
   return { subject: `PawMart order #${orderNo}: ${copy.title.toLowerCase()}`, html, text };
 }
+
+// Appointment dates in the app's timezone (APP_UTC_OFFSET), e.g. "Tuesday, October 20, 2026".
+function formatAppointmentDate(date) {
+  const [, sign, h, m] = env.appUtcOffset.match(/^([+-])(\d{2}):(\d{2})$/) || [null, '+', '00', '00'];
+  const offsetMs = (sign === '-' ? -1 : 1) * (Number(h) * 60 + Number(m)) * 60 * 1000;
+  return new Date(new Date(date).getTime() + offsetMs).toLocaleDateString('en-US', {
+    timeZone: 'UTC',
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
+function appointmentDetails({ appointment, service, providerName }) {
+  return [
+    ['Service', service?.name ?? 'Appointment'],
+    ['Provider', providerName],
+    ['When', `${formatAppointmentDate(appointment.scheduledAt)} at ${appointment.timeSlotLabel}`],
+    ['Pet', appointment.petDescription],
+    ...(service ? [['Price', money(service.priceCents)]] : []),
+  ];
+}
+
+function detailsHtml(rows) {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="font-size:14px;margin:0 0 16px;">${rows
+    .map(([k, v]) => `<tr><td style="padding:4px 16px 4px 0;color:#6b7280;">${k}</td><td style="padding:4px 0;">${escapeHtml(v)}</td></tr>`)
+    .join('')}</table>`;
+}
+
+export function appointmentBookedEmail({ appointment, service, providerName, customer, recipient }) {
+  const rows = appointmentDetails({ appointment, service, providerName });
+  const forProvider = recipient === 'provider';
+  const title = forProvider ? 'New booking received' : 'Your appointment is booked';
+  const intro = forProvider
+    ? `${customer.name} booked ${service.name}.`
+    : `Hi ${customer.name}, your appointment is confirmed.`;
+  const notes = appointment.notes ? [['Notes', appointment.notes]] : [];
+  const link = forProvider ? `${env.frontendUrl}/vendor-dashboard` : `${env.frontendUrl}/dashboard?tab=appointments`;
+
+  const html = layout(
+    title,
+    `<p style="margin:0 0 16px;">${escapeHtml(intro)}</p>${detailsHtml([...rows, ...notes])}${button(link, forProvider ? 'View your schedule' : 'View your appointments')}`
+  );
+  const text = [intro, '', ...[...rows, ...notes].map(([k, v]) => `${k}: ${v}`), '', link].join('\n');
+  return { subject: `PawMart: ${title.toLowerCase()} – ${service.name}`, html, text };
+}
+
+export function appointmentCancelledEmail({ appointment, service, providerName, customer, recipient }) {
+  const rows = appointmentDetails({ appointment, service, providerName });
+  const forProvider = recipient === 'provider';
+  const intro = forProvider
+    ? `${customer.name} cancelled their ${service?.name ?? 'appointment'}. The time slot is free again.`
+    : `Hi ${customer.name}, ${providerName} had to cancel your appointment.`;
+  const reason = !forProvider && appointment.cancelReason ? [['Reason', appointment.cancelReason]] : [];
+  const link = forProvider ? `${env.frontendUrl}/vendor-dashboard` : `${env.frontendUrl}/book-appointment`;
+
+  const html = layout(
+    'Appointment cancelled',
+    `<p style="margin:0 0 16px;">${escapeHtml(intro)}</p>${detailsHtml([...rows, ...reason])}${button(link, forProvider ? 'View your schedule' : 'Book another time')}`
+  );
+  const text = [intro, '', ...[...rows, ...reason].map(([k, v]) => `${k}: ${v}`), '', link].join('\n');
+  return { subject: `PawMart: appointment cancelled – ${service?.name ?? 'appointment'}`, html, text };
+}

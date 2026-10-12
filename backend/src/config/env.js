@@ -14,6 +14,9 @@ export const env = {
   mongodbUri: process.env.MONGODB_URI,
   jwtSecret: process.env.JWT_SECRET,
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+  // UTC offset appointment slots are interpreted in (Sri Lanka by default),
+  // so "09:00 AM" means the same moment whatever timezone the server runs in.
+  appUtcOffset: process.env.APP_UTC_OFFSET || '+05:30',
   // Email: when SMTP_HOST is unset, emails are logged to the console instead of sent.
   smtp: {
     host: process.env.SMTP_HOST,
