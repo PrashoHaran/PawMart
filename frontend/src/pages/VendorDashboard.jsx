@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Package, TrendingUp, DollarSign, Users, Plus, Edit2, Trash2 } from 'lucide-react';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../lib/api';
 import { optimizedImage } from '../lib/image';
@@ -15,113 +16,6 @@ const SIDEBAR_LINKS = [
   { icon: DollarSign, label: 'Orders', id: 'orders' },
   { icon: Users, label: 'Customers' },
 ];
-
-const BUSINESS_TYPES = [
-  { value: 'retail_vendor', label: 'Retail Vendor' },
-  { value: 'service_provider', label: 'Service Provider' },
-];
-
-
-function ApplicationGate({ token }) {
-  const [application, setApplication] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [businessName, setBusinessName] = useState('');
-  const [businessType, setBusinessType] = useState('retail_vendor');
-  const [applying, setApplying] = useState(false);
-
-  useEffect(() => {
-    apiRequest('/vendor-applications/me', { token })
-      .then(({ data }) => setApplication(data))
-      .catch((err) => setError(err))
-      .finally(() => setLoading(false));
-  }, [token]);
-
-  const submitApplication = async (e) => {
-    e.preventDefault();
-    setApplying(true);
-    setError(null);
-    try {
-      const { data } = await apiRequest('/vendor-applications', {
-        method: 'POST',
-        token,
-        body: { businessName, businessType },
-      });
-      setApplication(data);
-    } catch (err) {
-      setError(err);
-    } finally {
-      setApplying(false);
-    }
-  };
-
-  if (loading) {
-    return <p className="text-center text-gray-500 py-12">Loading...</p>;
-  }
-
-  if (application?.status === 'pending') {
-    return (
-      <div className="max-w-lg mx-auto bg-white rounded-2xl border border-gray-100 p-8 text-center">
-        <span className="badge badge-warning mb-4">Pending Review</span>
-        <h1 className="text-2xl font-heading font-bold text-gray-900 mb-2">Application Submitted</h1>
-        <p className="text-gray-600">
-          Your application for <strong>{application.businessName}</strong> is awaiting admin approval.
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-lg mx-auto bg-white rounded-2xl border border-gray-100 p-8">
-      <h1 className="text-2xl font-heading font-bold text-gray-900 mb-2">Become a Vendor</h1>
-      <p className="text-gray-600 mb-6">Apply to sell products on PawMart. An admin will review your application.</p>
-
-      {application?.status === 'rejected' && (
-        <div className="alert alert-warning mb-6" role="alert">
-          <p className="text-sm text-orange-700">
-            Your previous application was rejected{application.rejectionReason ? `: ${application.rejectionReason}` : '.'} You can apply again below.
-          </p>
-        </div>
-      )}
-
-      {error && (
-        <div className="alert alert-warning mb-6" role="alert">
-          <p className="text-sm text-orange-700">{error.message}</p>
-        </div>
-      )}
-
-      <form onSubmit={submitApplication} className="space-y-4">
-        <div>
-          <label htmlFor="business-name" className="block text-sm font-medium text-gray-700 mb-1">Business Name</label>
-          <input
-            id="business-name"
-            type="text"
-            required
-            className="input-field"
-            value={businessName}
-            onChange={(e) => setBusinessName(e.target.value)}
-          />
-        </div>
-        <div>
-          <label htmlFor="business-type" className="block text-sm font-medium text-gray-700 mb-1">Business Type</label>
-          <select
-            id="business-type"
-            className="input-field"
-            value={businessType}
-            onChange={(e) => setBusinessType(e.target.value)}
-          >
-            {BUSINESS_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>{t.label}</option>
-            ))}
-          </select>
-        </div>
-        <button type="submit" disabled={applying} className="btn-primary w-full disabled:opacity-50">
-          {applying ? 'Submitting...' : 'Submit Application'}
-        </button>
-      </form>
-    </div>
-  );
-}
 
 export default function VendorDashboard() {
   const { user, token } = useAuth();
@@ -199,11 +93,7 @@ export default function VendorDashboard() {
   }
 
   if (!isVendor) {
-    return (
-      <div className="min-h-[calc(100vh-64px)] bg-gray-50 py-12 px-6">
-        <ApplicationGate token={token} />
-      </div>
-    );
+    return <Navigate to="/vendor-application" replace />;
   }
 
   if (isProvider) {

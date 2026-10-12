@@ -9,6 +9,7 @@ import Marketplace from './pages/Marketplace';
 import ProductDetail from './pages/ProductDetail';
 import UserDashboard from './pages/UserDashboard';
 import VendorDashboard from './pages/VendorDashboard';
+import VendorApplication from './pages/VendorApplication';
 import SmartAssistant from './pages/SmartAssistant';
 import AppointmentBooking from './pages/AppointmentBooking';
 import Cart from './pages/Cart';
@@ -27,6 +28,7 @@ function App() {
             <Route path="/product/:id" element={<ProductDetail />} />
             <Route path="/dashboard" element={<UserDashboard />} />
             <Route path="/vendor-dashboard" element={<VendorDashboard />} />
+            <Route path="/vendor-application" element={<VendorApplication />} />
             <Route path="/assistant" element={<SmartAssistant />} />
             <Route path="/book-appointment" element={<AppointmentBooking />} />
             <Route path="/cart" element={<Cart />} />
