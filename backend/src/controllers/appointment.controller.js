@@ -7,6 +7,7 @@ import { appointmentBookedEmail, appointmentCancelledEmail } from '../services/e
 import { ApiError } from '../utils/ApiError.js';
 import { sendData } from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { publicServiceFilter } from '../utils/visibility.js';
 import { parseSlotToDate, serviceSchedule, weekdayOf } from '../utils/appointmentTime.js';
 
 const SERVICE_FIELDS = 'name type durationMinutes priceCents providerId';
@@ -36,7 +37,7 @@ async function providerOf(service) {
 export const createAppointment = asyncHandler(async (req, res) => {
   const { serviceId, date, timeSlotLabel, petId, petDescription, notes } = req.body;
 
-  const service = await Service.findOne({ _id: serviceId, active: true });
+  const service = await Service.findOne({ _id: serviceId, ...(await publicServiceFilter()) });
   if (!service) {
     throw ApiError.notFound('Service not found');
   }

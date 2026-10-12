@@ -24,6 +24,9 @@ export const requireAuth = asyncHandler(async (req, res, next) => {
   if (!user || user.tokenVersion !== payload.tokenVersion) {
     throw ApiError.unauthorized('Session no longer valid');
   }
+  if (user.status === 'suspended') {
+    throw ApiError.unauthorized('This account has been suspended');
+  }
 
   req.user = await ensureBusinessType(user);
   next();

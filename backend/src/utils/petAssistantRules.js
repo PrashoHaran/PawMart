@@ -1,4 +1,5 @@
 import { Product } from '../models/Product.js';
+import { publicProductFilter } from './visibility.js';
 
 // Resting Energy Requirement (RER) in kcal/day, a standard veterinary nutrition
 // formula: RER = 70 * (body weight in kg) ^ 0.75.
@@ -61,7 +62,7 @@ function parseAllergyTerms(allergiesText) {
 export async function recommendProducts(petType, allergiesText, limit = 4) {
   const allergyTerms = parseAllergyTerms(allergiesText);
 
-  const candidates = await Product.find({ category: { $in: ['Food', 'Health', 'Accessories'] } })
+  const candidates = await Product.find({ ...(await publicProductFilter()), category: { $in: ['Food', 'Health', 'Accessories'] } })
     .sort({ rating: -1 })
     .limit(20)
     .lean();

@@ -13,6 +13,9 @@ const productSchema = new mongoose.Schema(
     vendorName: { type: String, required: true },
     vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     stock: { type: Number, required: true, min: 0, default: 0 },
+    // Hidden by an admin (moderation); hidden products can't be viewed or bought.
+    hidden: { type: Boolean, default: false },
+    hiddenReason: { type: String, default: '' },
   },
   { timestamps: true }
 );

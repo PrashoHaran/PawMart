@@ -39,6 +39,9 @@ export const login = asyncHandler(async (req, res) => {
   if (!valid) {
     throw ApiError.unauthorized('Invalid email or password');
   }
+  if (user.status === 'suspended') {
+    throw ApiError.forbidden('This account has been suspended. Contact PawMart support for help.');
+  }
 
   await ensureBusinessType(user);
   sendData(res, 200, { user, token: issueToken(user) });

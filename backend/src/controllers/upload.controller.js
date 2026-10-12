@@ -6,7 +6,7 @@ export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 // Which roles may upload for each purpose, and the folder the image lands in.
 const PURPOSES = {
-  product: { roles: ['vendor'], folder: () => 'pawmart/products' },
+  product: { roles: ['vendor', 'admin'], folder: () => 'pawmart/products' },
   pet: { roles: ['customer', 'vendor', 'admin'], folder: (user) => `pawmart/pets/${user._id}` },
 };
 

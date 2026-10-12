@@ -11,6 +11,11 @@ const userSchema = new mongoose.Schema(
     // sells products or offers bookable services.
     businessType: { type: String, enum: ['retail_vendor', 'service_provider'] },
     tokenVersion: { type: Number, default: 0 },
+    // Suspended accounts can't sign in, and their products/services are
+    // hidden from customers.
+    status: { type: String, enum: ['active', 'suspended'], default: 'active' },
+    suspendedAt: { type: Date, default: null },
+    suspendReason: { type: String, default: '' },
   },
   { timestamps: true }
 );

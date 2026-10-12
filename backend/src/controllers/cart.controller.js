@@ -1,5 +1,6 @@
 import { Cart } from '../models/Cart.js';
 import { Product } from '../models/Product.js';
+import { publicProductFilter } from '../utils/visibility.js';
 import { ApiError } from '../utils/ApiError.js';
 import { sendData } from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -33,7 +34,7 @@ export const getCart = asyncHandler(async (req, res) => {
 export const addCartItem = asyncHandler(async (req, res) => {
   const { productId, quantity } = req.body;
 
-  const product = await Product.findById(productId);
+  const product = await Product.findOne({ _id: productId, ...(await publicProductFilter()) });
   if (!product) {
     throw ApiError.notFound('Product not found');
   }

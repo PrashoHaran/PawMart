@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Package, TrendingUp, DollarSign, Users, Plus, Edit2, Trash2, X } from 'lucide-react';
+import { Package, TrendingUp, DollarSign, Users, Plus, Edit2, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../lib/api';
 import { optimizedImage } from '../lib/image';
-import ImageUploadField from '../components/ImageUploadField';
+import ProductForm from '../components/ProductForm';
+import { EMPTY_PRODUCT_FORM } from '../components/productFormDefaults';
 import ManageOrdersPanel from '../components/orders/ManageOrdersPanel';
 import ProviderDashboard from '../components/provider/ProviderDashboard';
 import { formatPriceCents } from '../lib/format';
@@ -20,7 +21,6 @@ const BUSINESS_TYPES = [
   { value: 'service_provider', label: 'Service Provider' },
 ];
 
-const EMPTY_FORM = { name: '', priceCents: '', category: '', image: '', stock: '', description: '' };
 
 function ApplicationGate({ token }) {
   const [application, setApplication] = useState(null);
@@ -119,52 +119,6 @@ function ApplicationGate({ token }) {
           {applying ? 'Submitting...' : 'Submit Application'}
         </button>
       </form>
-    </div>
-  );
-}
-
-function ProductForm({ initial, onCancel, onSubmit, saving }) {
-  const [form, setForm] = useState(initial);
-  const [uploading, setUploading] = useState(false);
-
-  const updateField = (field) => (e) => setForm((prev) => ({ ...prev, [field]: e.target.value }));
-
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-gray-900">{initial.editingId ? 'Edit Product' : 'Add Product'}</h2>
-          <button type="button" onClick={onCancel} aria-label="Close" className="text-gray-400 hover:text-gray-600">
-            <X className="h-5 w-5" aria-hidden="true" />
-          </button>
-        </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSubmit(form);
-          }}
-          className="space-y-3"
-        >
-          <input required placeholder="Product name" className="input-field" value={form.name} onChange={updateField('name')} />
-          <div className="grid grid-cols-2 gap-3">
-            <input required type="number" min="0" placeholder="Price (cents)" className="input-field" value={form.priceCents} onChange={updateField('priceCents')} />
-            <input required type="number" min="0" placeholder="Stock" className="input-field" value={form.stock} onChange={updateField('stock')} />
-          </div>
-          <input required placeholder="Category" className="input-field" value={form.category} onChange={updateField('category')} />
-          <ImageUploadField
-            label="Product image"
-            purpose="product"
-            required
-            value={form.image}
-            onChange={(url) => setForm((prev) => ({ ...prev, image: url }))}
-            onUploadingChange={setUploading}
-          />
-          <textarea placeholder="Description (optional)" className="input-field min-h-[80px]" value={form.description} onChange={updateField('description')} />
-          <button type="submit" disabled={saving || uploading} className="btn-primary w-full disabled:opacity-50">
-            {saving ? 'Saving...' : 'Save Product'}
-          </button>
-        </form>
-      </div>
     </div>
   );
 }
@@ -409,7 +363,16 @@ export default function VendorDashboard() {
                       <td className="px-6 py-4 text-gray-600">${formatPriceCents(product.priceCents)}</td>
                       <td className="px-6 py-4 text-gray-600">{product.stock}</td>
                       <td className="px-6 py-4">
-                        <span className="badge badge-success">Active</span>
+                        {product.hidden ? (
+                          <span className="badge badge-danger" title={product.hiddenReason}>Hidden by admin</span>
+                        ) : product.stock === 0 ? (
+                          <span className="badge badge-warning">Out of stock</span>
+                        ) : (
+                          <span className="badge badge-success">Active</span>
+                        )}
+                        {product.hidden && product.hiddenReason && (
+                          <p className="text-xs text-gray-500 mt-1">{product.hiddenReason}</p>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2">
@@ -455,7 +418,7 @@ export default function VendorDashboard() {
                   stock: editingProduct.stock,
                   description: editingProduct.description || '',
                 }
-              : { ...EMPTY_FORM, editingId: null }
+              : { ...EMPTY_PRODUCT_FORM, editingId: null }
           }
           saving={saving}
           onCancel={() => { setShowForm(false); setEditingProduct(null); }}

@@ -9,7 +9,8 @@ const NAV_LINKS = [
   { to: '/assistant', label: 'Smart Assistant' },
   { to: '/book-appointment', label: 'Book Appointment' },
   { to: '/dashboard', label: 'Profile' },
-  { to: '/admin-dashboard', label: 'Admin' },
+  { to: '/vendor-dashboard', label: 'Vendor Portal', role: 'vendor' },
+  { to: '/admin-dashboard', label: 'Admin', role: 'admin' },
 ];
 
 export default function Navbar() {
@@ -37,7 +38,7 @@ export default function Navbar() {
           </div>
           
           <div className="hidden md:flex space-x-6 lg:space-x-8 items-center">
-            {NAV_LINKS.map((link) => (
+            {NAV_LINKS.filter((link) => !link.role || link.role === user?.role).map((link) => (
               <Link key={link.to} to={link.to} className="text-gray-600 hover:text-primary font-medium transition-colors text-sm lg:text-base">
                 {link.label}
               </Link>
@@ -97,7 +98,7 @@ export default function Navbar() {
 
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-gray-100 py-4 space-y-1">
-            {NAV_LINKS.map((link) => (
+            {NAV_LINKS.filter((link) => !link.role || link.role === user?.role).map((link) => (
               <Link
                 key={link.to}
                 to={link.to}

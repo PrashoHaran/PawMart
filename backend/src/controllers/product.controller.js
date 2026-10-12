@@ -1,4 +1,5 @@
 import { Product } from '../models/Product.js';
+import { publicProductFilter } from '../utils/visibility.js';
 import { ApiError } from '../utils/ApiError.js';
 import { sendData } from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -6,7 +7,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 export const listProducts = asyncHandler(async (req, res) => {
   const { category, search, page, limit } = req.query;
 
-  const filter = {};
+  const filter = await publicProductFilter();
   if (category && category !== 'All') {
     filter.category = category;
   }
@@ -27,7 +28,7 @@ export const listProducts = asyncHandler(async (req, res) => {
 });
 
 export const getProduct = asyncHandler(async (req, res) => {
-  const product = await Product.findById(req.params.id).lean();
+  const product = await Product.findOne({ _id: req.params.id, ...(await publicProductFilter()) }).lean();
   if (!product) {
     throw ApiError.notFound('Product not found');
   }

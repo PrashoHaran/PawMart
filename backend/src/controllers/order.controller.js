@@ -9,6 +9,7 @@ import { cancelOrder as cancelOrderService, withPayments } from '../services/ord
 import { ApiError } from '../utils/ApiError.js';
 import { sendData } from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { publicProductFilter } from '../utils/visibility.js';
 
 const FREE_SHIPPING_THRESHOLD_CENTS = 5000;
 const FLAT_SHIPPING_CENTS = 599;
@@ -40,6 +41,17 @@ export const createOrder = asyncHandler(async (req, res) => {
 
   if (!cart || cart.items.length === 0) {
     throw ApiError.badRequest('Cart is empty');
+  }
+
+  const available = new Set(
+    (await Product.find({ _id: { $in: cart.items.map((i) => i.product._id) }, ...(await publicProductFilter()) }).distinct('_id')).map(String)
+  );
+  const unavailable = cart.items.filter((i) => !available.has(String(i.product._id)));
+  if (unavailable.length) {
+    throw ApiError.conflict(
+      `No longer available: ${unavailable.map((i) => i.product.name).join(', ')}. Remove ${unavailable.length === 1 ? 'it' : 'them'} from your cart to continue.`,
+      unavailable.map((i) => ({ field: 'items', productId: String(i.product._id) }))
+    );
   }
 
   // Atomically decrement stock per item; roll back any already-decremented

@@ -1,8 +1,6 @@
 import { Appointment } from '../models/Appointment.js';
 import { Service } from '../models/Service.js';
-import { User } from '../models/User.js';
-import { sendMail } from '../services/mailer.js';
-import { appointmentCancelledEmail } from '../services/emailTemplates.js';
+import { changeAppointmentStatus } from '../services/appointmentStatus.js';
 import { ApiError } from '../utils/ApiError.js';
 import { sendData } from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -87,39 +85,8 @@ export const updateMyAppointmentStatus = asyncHandler(async (req, res) => {
   if (!appointment) {
     throw ApiError.notFound('Appointment not found');
   }
-  if (appointment.status !== 'booked') {
-    throw ApiError.conflict(`Appointment is already ${appointment.status.replace('_', ' ')}`);
-  }
-
-  const { status, reason } = req.body;
-  const started = appointment.scheduledAt.getTime() <= Date.now();
-  if (status === 'cancelled' && started) {
-    throw ApiError.badRequest('Past appointments cannot be cancelled; mark them completed or no-show');
-  }
-  if (status !== 'cancelled' && !started) {
-    throw ApiError.badRequest('Appointments can only be marked completed or no-show once they have started');
-  }
-
-  appointment.status = status;
-  if (status === 'cancelled') {
-    appointment.cancelledBy = 'provider';
-    appointment.cancelReason = reason;
-  }
-  await appointment.save();
+  await changeAppointmentStatus(appointment, { ...req.body, byRole: 'provider' });
   sendData(res, 200, appointment);
-
-  if (status === 'cancelled') {
-    const [service, customer] = await Promise.all([
-      Service.findById(appointment.service).lean(),
-      User.findById(appointment.userId, 'name email').lean(),
-    ]);
-    if (customer) {
-      sendMail({
-        to: customer.email,
-        ...appointmentCancelledEmail({ appointment, service, customer, recipient: 'customer', providerName: req.user.businessName }),
-      });
-    }
-  }
 });
 
 export const getMyProviderStats = asyncHandler(async (req, res) => {

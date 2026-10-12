@@ -3,6 +3,7 @@ import { Service } from '../models/Service.js';
 import { ApiError } from '../utils/ApiError.js';
 import { sendData } from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { publicServiceFilter } from '../utils/visibility.js';
 import { parseSlotToDate, serviceSchedule, weekdayOf } from '../utils/appointmentTime.js';
 
 export function serializeService(service) {
@@ -16,7 +17,7 @@ export function serializeService(service) {
 }
 
 export const listServices = asyncHandler(async (req, res) => {
-  const services = await Service.find({ active: true })
+  const services = await Service.find(await publicServiceFilter())
     .sort({ name: 1 })
     .populate('providerId', 'businessName')
     .lean();
@@ -26,7 +27,7 @@ export const listServices = asyncHandler(async (req, res) => {
 // Which of a service's slots can still be booked on a given date.
 export const getAvailability = asyncHandler(async (req, res) => {
   const { date } = req.query;
-  const service = await Service.findOne({ _id: req.params.id, active: true }).lean();
+  const service = await Service.findOne({ _id: req.params.id, ...(await publicServiceFilter()) }).lean();
   if (!service) {
     throw ApiError.notFound('Service not found');
   }
