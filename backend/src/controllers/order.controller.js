@@ -1,6 +1,8 @@
 import { Cart } from '../models/Cart.js';
 import { Order } from '../models/Order.js';
 import { Product } from '../models/Product.js';
+import { sendMail } from '../services/mailer.js';
+import { orderConfirmationEmail } from '../services/emailTemplates.js';
 import { ApiError } from '../utils/ApiError.js';
 import { sendData } from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -69,6 +71,9 @@ export const createOrder = asyncHandler(async (req, res) => {
   await cart.save();
 
   sendData(res, 201, order);
+
+  // Fire-and-forget: the order is already placed, so don't make the client wait on SMTP.
+  sendMail({ to: req.user.email, ...orderConfirmationEmail(req.user, order) });
 });
 
 export const listOrders = asyncHandler(async (req, res) => {

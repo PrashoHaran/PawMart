@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Users, AlertTriangle, ShieldCheck, Database, Settings, Store, Activity, PieChart } from 'lucide-react';
+import { Users, AlertTriangle, ShieldCheck, Database, Settings, Store, Activity, PieChart, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../lib/api';
 
@@ -17,6 +17,8 @@ export default function AdminDashboard() {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [runningReminders, setRunningReminders] = useState(false);
+  const [reminderResult, setReminderResult] = useState(null);
 
   const isAdmin = user?.role === 'admin';
 
@@ -44,6 +46,25 @@ export default function AdminDashboard() {
       );
     } catch (err) {
       setError(err);
+    }
+  };
+
+  const runReminders = async () => {
+    setRunningReminders(true);
+    setReminderResult(null);
+    try {
+      const { data } = await apiRequest('/admin/reminders/vaccinations/run', { method: 'POST', token });
+      setReminderResult({
+        ok: data.emailsFailed === 0,
+        text:
+          data.emailsSent === 0 && data.emailsFailed === 0
+            ? 'No vaccination reminders were due.'
+            : `Sent ${data.emailsSent} reminder email${data.emailsSent === 1 ? '' : 's'} covering ${data.vaccinations} vaccination${data.vaccinations === 1 ? '' : 's'}${data.emailsFailed ? `; ${data.emailsFailed} failed and will be retried` : ''}.`,
+      });
+    } catch (err) {
+      setReminderResult({ ok: false, text: `Couldn't run reminders: ${err.message}` });
+    } finally {
+      setRunningReminders(false);
     }
   };
 
@@ -101,14 +122,30 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <main className="flex-1 p-6 lg:p-10">
         <div className="max-w-6xl mx-auto">
-          <div className="flex justify-between items-center mb-8">
+          <div className="flex flex-wrap gap-4 justify-between items-center mb-8">
             <h1 className="text-3xl font-heading font-bold text-gray-900">Platform Overview</h1>
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-4 items-center">
+              <button
+                type="button"
+                onClick={runReminders}
+                disabled={runningReminders}
+                title="Email owners whose pets have vaccinations due within 7 days or overdue"
+                className="btn-outline flex items-center gap-2 disabled:opacity-50"
+              >
+                <Mail className="h-4 w-4" aria-hidden="true" />
+                {runningReminders ? 'Sending...' : 'Send Vaccine Reminders Now'}
+              </button>
               <span className="badge badge-success !px-4 !py-2 !text-sm">
                 <Database className="h-4 w-4" aria-hidden="true" /> Systems Operational
               </span>
             </div>
           </div>
+
+          {reminderResult && (
+            <div className={`alert ${reminderResult.ok ? 'alert-success' : 'alert-warning'} mb-8`} role="status">
+              <p className={`text-sm ${reminderResult.ok ? 'text-green-700' : 'text-orange-700'}`}>{reminderResult.text}</p>
+            </div>
+          )}
 
           {error && (
             <div className="alert alert-warning mb-8" role="alert">

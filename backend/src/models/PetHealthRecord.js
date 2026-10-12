@@ -6,6 +6,9 @@ const vaccinationSchema = new mongoose.Schema({
   nextDueDate: { type: Date, default: null },
   vetName: { type: String, default: '', trim: true },
   notes: { type: String, default: '', trim: true },
+  // The nextDueDate a reminder email was last sent for; changing the due
+  // date re-arms the reminder.
+  reminderSentFor: { type: Date, default: null },
 });
 
 // One health record per pet (Pet 1 — 1 PetHealthRecord in the ERD).

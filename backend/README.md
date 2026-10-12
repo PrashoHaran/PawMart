@@ -115,7 +115,26 @@ Defined in [`.env.example`](.env.example). Copy it to `.env` (gitignored) and fi
 | `NODE_ENV` | No | `development` | `development` enables verbose (`dev`-format) request logging; anything else uses `combined` format |
 | `MONGODB_URI` | **Yes** | — | Full MongoDB Atlas connection string, including database name |
 | `JWT_SECRET` | **Yes** | — | Secret used to sign/verify JWTs — use a long random string |
-| `FRONTEND_URL` | No | `http://localhost:5173` | Origin allowed by CORS (the Vite dev server by default) |
+| `FRONTEND_URL` | No | `http://localhost:5173` | Origin allowed by CORS (the Vite dev server by default); also used for links in emails |
+| `SMTP_HOST` | No | — | SMTP server. **If unset, emails are printed to the console instead of sent** |
+| `SMTP_PORT` | No | `587` | SMTP port |
+| `SMTP_SECURE` | No | `false` | `true` for implicit TLS (port 465); `false` uses STARTTLS on 587 |
+| `SMTP_USER` / `SMTP_PASS` | No | — | SMTP credentials (for Gmail, an [App Password](https://support.google.com/accounts/answer/185833)) |
+| `EMAIL_FROM` | No | `PawMart <no-reply@pawmart.local>` | Sender shown on outgoing emails |
+| `REMINDERS_ENABLED` | No | `true` | Set `false` to disable the daily vaccination reminder job |
+| `REMINDER_CRON` | No | `0 8 * * *` | Cron expression for the reminder job |
+| `REMINDER_TZ` | No | `Asia/Colombo` | Timezone the cron expression is evaluated in |
+| `REMINDER_DAYS_BEFORE` | No | `7` | Remind about vaccinations due within this many days (overdue ones are always included) |
+
+### Email notifications
+
+Emails are sent with Nodemailer and never block or fail the action that triggers them.
+
+- **Order confirmation** — sent after a successful checkout.
+- **Vaccination reminders** — a `node-cron` job (daily, 08:00 Asia/Colombo by default) emails each owner about pets whose latest dose of a vaccine is due within `REMINDER_DAYS_BEFORE` days or overdue — one email per pet. Each vaccination remembers the due date it was reminded about (`reminderSentFor`), so a reminder is sent once per due date; editing the due date re-arms it. Failed sends are retried on the next run.
+- Admins can trigger the reminder job immediately with `POST /api/admin/reminders/vaccinations/run` (or the **Send Vaccine Reminders Now** button on the Admin Hub) — useful for demos, and on free hosting tiers where a sleeping server can miss the scheduled run.
+
+For local testing without a real mailbox, leave `SMTP_HOST` empty (emails go to the console), or run [Mailpit](https://mailpit.axllent.org/) (`docker run -p 1025:1025 -p 8025:8025 axllent/mailpit`) with `SMTP_HOST=127.0.0.1`, `SMTP_PORT=1025` and open http://localhost:8025.
 
 ## Running the Project
 
@@ -314,6 +333,7 @@ There is no deployment configuration (Dockerfile, CI/CD, hosting-specific config
 - Use `npm run start` (not `dev`) in production.
 - Atlas's **Network Access** list must allow the deployment host's outbound IP (or `0.0.0.0/0`, with the tradeoffs that implies).
 - `NODE_ENV=production` switches request logging to the more compact `combined` format.
+- Set the `SMTP_*` and `EMAIL_FROM` variables to send real emails. Free-tier hosts (e.g. Render) sleep when idle, so the 08:00 reminder job may not fire — use the admin "run now" endpoint, or an external scheduler that calls it.
 
 ## Troubleshooting
 
