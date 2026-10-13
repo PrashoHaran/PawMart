@@ -3,7 +3,7 @@
 **Academic Submission: Group 17**  
 **Team:** V. Prashoharan, Bashini Rashmika Vindyani, J.P. Inuka Sithanja Jayasinghe, D.S.N. Vitharana, B.R.G.S. Sandaruwan
 
-PawMart is a pet marketplace web application designed as a one-stop platform for purchasing pet products and accessing pet care services. The system combines a customer-facing marketplace with vendor, administrator, appointment booking, pet-care assistance, and pet-management features.
+PawMart is a pet marketplace web application designed as a one-stop platform for purchasing pet products and accessing pet care services. The system combines a customer-facing marketplace with vendor, service-provider and administrator dashboards, appointment booking, pet health records with vaccination reminders, and a rule-based Smart Pet Care Assistant.
 
 This repository contains two independent projects:
 - A React + Vite frontend
@@ -19,6 +19,7 @@ This repository contains two independent projects:
 - [Current Features](#current-features)
 - [Team Contributions](#team-contributions)
 - [Quick Start](#quick-start)
+- [Database](#database)
 - [Development Notes](#development-notes)
 - [Remaining Work](#remaining-work)
 - [Documentation](#documentation)
@@ -27,28 +28,27 @@ This repository contains two independent projects:
 
 ## Project Status
 
-PawMart is currently in the active MVP development stage. The core marketplace workflow and several supporting modules have been implemented and connected to the backend and database.
+PawMart is feature-complete against the original proposal and running end-to-end against MongoDB Atlas. Deployment and automated testing remain.
 
 | Area | Status |
 |---|---|
 | Authentication (register/login/session) | ✅ Implemented |
-| Role-based authorization | ✅ Implemented |
-| Product marketplace | ✅ Implemented |
-| Product search and category filtering | ✅ Implemented |
+| Role-based authorization (customer / vendor / service provider / admin) | ✅ Implemented |
+| Product marketplace, search and category filtering | ✅ Implemented |
 | Product details | ✅ Implemented |
-| Cart | ✅ Implemented with backend/database |
-| Checkout | ✅ Implemented |
-| Simulated payment | ✅ Implemented |
-| Order management | ✅ Implemented |
+| Reviews and ratings (verified purchasers) | ✅ Implemented |
+| Cart and checkout | ✅ Implemented with backend/database |
+| Simulated card payment (with declines and refunds) | ✅ Implemented |
+| Order management and tracking | ✅ Implemented |
 | Vendor application workflow | ✅ Implemented |
 | Vendor product management | ✅ Implemented |
-| Admin dashboard | ✅ Implemented |
-| Appointment booking | ✅ Implemented with backend/database |
-| Smart Pet Care Assistant | ✅ Implemented |
-| Reviews and ratings | 🚧 Remaining |
-| Pet health records | 🚧 Remaining |
-| Vaccination reminders / email notifications | 🚧 Remaining |
-| Cloudinary image uploads | 🚧 Remaining |
+| Service provider portal (services, availability, bookings) | ✅ Implemented |
+| Appointment booking with live availability | ✅ Implemented |
+| Pet profiles and health records | ✅ Implemented |
+| Vaccination reminders and email notifications | ✅ Implemented |
+| Cloudinary image uploads | ✅ Implemented |
+| Smart Pet Care Assistant (breed-specific) | ✅ Implemented |
+| Admin dashboard (users, products, orders, appointments, reports) | ✅ Implemented |
 | Automated testing | 🚧 Remaining |
 | Deployment | 🚧 Remaining |
 
@@ -61,9 +61,9 @@ PawMart/
 ├── frontend/              # React + Vite single-page application
 ├── backend/               # Node.js + Express + MongoDB Atlas REST API
 ├── projectDetails/        # Project-related documentation/materials
-├── Group_01.md             # Group/project information
-├── PROGRESS_REPORT.md      # Current development progress
-├── README.md               # Project overview and setup
+├── Group_17.md            # Group/project information
+├── PROGRESS_REPORT.md     # Interim (CA 02) progress report
+├── README.md              # Project overview and setup
 └── .gitignore
 ```
 
@@ -75,12 +75,15 @@ PawMart/
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 19, Vite, React Router, Tailwind CSS |
-| Backend | Node.js, Express, Mongoose |
+| Frontend | React 19, Vite, React Router, Tailwind CSS, lucide-react |
+| Backend | Node.js, Express, Mongoose, Zod validation |
 | Database | MongoDB Atlas |
 | Authentication | JWT + bcrypt |
+| Image hosting | Cloudinary (signed direct uploads) |
+| Email | Nodemailer (SMTP) |
+| Background jobs | node-cron (daily vaccination reminders) |
+| Payments | Simulated card gateway (no real charges) |
 | API | REST API |
-| Development | Antigravity IDE / VS Code-compatible workflow |
 
 ---
 
@@ -88,60 +91,56 @@ PawMart/
 
 ### Customer / Pet Owner
 
-- User registration and login
-- Persistent authentication session
-- Browse pet products
-- Search products
-- Filter products by category
-- View product details
-- Add products to cart
-- Update cart quantities
-- Checkout with shipping information
-- Simulated payment
-- View orders
-- Book pet-care appointments
-- Access the Smart Pet Care Assistant
-- Access user profile
+- Register, log in, and stay signed in across page reloads
+- Browse, search and filter products; view product details
+- Read reviews, and leave a star rating and review after buying a product
+- Server-persisted cart and checkout with shipping details
+- Pay by simulated card (with test cards for declines) or cash on delivery
+- Track orders (confirmed → processing → shipped → delivered) and cancel before shipping, with refunds for card payments
+- Pet profiles (species, breed, birth date, weight, allergies, photo)
+- Health records: vaccination history with due/overdue tracking, medical conditions and notes
+- Email vaccination reminders before vaccines are due
+- Book vet and grooming appointments, seeing only open days and free time slots; cancel upcoming bookings
+- Smart Pet Care Assistant: daily calories, meals, breed-specific care tips, health watch-outs and product picks
 
-### Vendor
+### Retail Vendor
 
-- Vendor application workflow
-- Vendor dashboard
-- Product management
-- Product creation and management
-- Vendor-related management features
+- Apply to become a vendor (admin approval)
+- Manage products with Cloudinary image uploads
+- Fulfil orders for their own products step by step
+- Sales and order statistics
+
+### Service Provider (vets, groomers)
+
+- Provider Portal: create services with price, duration, open days and time slots
+- See bookings, cancel with a reason (emailed to the customer), mark visits completed or no-show
+- Upcoming, completed and earnings statistics
 
 ### Administrator
 
-- Admin dashboard
-- Administrative management features
-- Vendor application management
-- Product and system management
-
-### Pet Care
-
-- Appointment booking
-- Smart Pet Care Assistant
-- Pet-care related user interactions
+- Platform health overview with real alerts (pending applications, low stock, unprocessed orders, configuration warnings)
+- Manage users: search, suspend/reactivate (hides their listings), appoint admins
+- Vendor verification with full application history
+- Moderate products (hide with a reason) and manage PawMart's own catalogue
+- Manage all orders (advance, cancel and refund) and all appointments, including PawMart Clinic services
+- Analytics reports: revenue over time, top products, order and appointment breakdowns, new sign-ups
+- Trigger vaccination reminder emails on demand
 
 ---
 
 ## Main Frontend UIs
 
-The current implementation contains multiple functional UI areas, including:
-
 1. Home / Landing Page
 2. Login and Registration
 3. Marketplace
-4. Product Details
-5. Cart and Checkout
-6. Vendor Application
-7. Vendor Product Management / Dashboard
-8. Admin Dashboard
-9. Appointment Booking
-10. Smart Pet Care Assistant
-
-These interfaces provide sufficient frontend scope for the five-member group project and allow each member to contribute to a distinct functional area.
+4. Product Details (with reviews)
+5. Cart and Checkout (simulated payment)
+6. User Dashboard (overview, pets & health records, appointments, order history)
+7. Vendor Application
+8. Vendor Dashboard (products, orders) / Provider Portal (services, appointments)
+9. Admin Dashboard (health, orders, users, verification, products, appointments, reports)
+10. Appointment Booking
+11. Smart Pet Care Assistant
 
 ---
 
@@ -155,7 +154,7 @@ These interfaces provide sufficient frontend scope for the five-member group pro
 | D.S.N. Vitharana | Order Management, Appointment Booking |
 | B.R.G.S. Sandaruwan | Reviews, Smart Pet Care Assistant, Pet Health Records |
 
-The remaining work will be completed collaboratively where features require integration between multiple modules.
+Features that span modules (for example appointments linked to pet profiles, or order emails) were completed collaboratively.
 
 ---
 
@@ -194,10 +193,22 @@ JWT_SECRET=your_secret_key
 FRONTEND_URL=http://localhost:5173
 ```
 
-Then seed the product catalogue:
+Everything else is optional and has a safe fallback:
+
+| Setting | Without it |
+|---|---|
+| `SMTP_*`, `EMAIL_FROM` | Emails are printed to the backend console instead of sent |
+| `CLOUDINARY_*` | Image fields fall back to pasting an image URL |
+| `REMINDER_*` | Vaccination reminders run daily at 08:00 Sri Lanka time |
+| `APP_UTC_OFFSET` | Appointment times use Sri Lanka time (`+05:30`) |
+
+See [`backend/README.md`](backend/README.md#environment-variables) for every setting.
+
+Seed the starter data (run once on a new database):
 
 ```bash
-npm run seed
+npm run seed            # product catalogue (replaces existing products)
+npm run seed:services   # PawMart Clinic vet and grooming services
 ```
 
 Start the backend:
@@ -206,16 +217,12 @@ Start the backend:
 npm run dev
 ```
 
-The backend runs on:
+The backend runs on `http://localhost:5000`, with the API at `http://localhost:5000/api`.
 
-```text
-http://localhost:5000
-```
+To get an admin account, register normally on the website, then run:
 
-The API base URL is:
-
-```text
-http://localhost:5000/api
+```bash
+npm run make-admin -- you@example.com
 ```
 
 ### 2. Frontend
@@ -228,33 +235,39 @@ npm install
 npm run dev
 ```
 
-The frontend normally runs on:
+The frontend normally runs on `http://localhost:5173`. Open the displayed Vite URL in your browser.
 
-```text
-http://localhost:5173
-```
+> If port 5173 is already in use, Vite may automatically start on another port such as 5174. Make sure the backend's `FRONTEND_URL` matches the port being used, or CORS will block requests.
 
-Open the displayed Vite URL in your browser.
+### Trying the simulated payment
 
-> If port 5173 is already in use, Vite may automatically start on another port such as 5174. Make sure the backend CORS/frontend configuration matches the port being used.
+Checkout accepts these test cards (any future expiry, any 3-digit CVC):
+
+| Card number | Result |
+|---|---|
+| `4242 4242 4242 4242` | Approved |
+| `4000 0000 0000 0002` | Declined |
+| `4000 0000 0000 9995` | Insufficient funds |
 
 ---
 
 ## Database
 
-PawMart uses MongoDB Atlas as the database.
+PawMart uses MongoDB Atlas. The application uses these collections:
 
-The current application uses collections/models for areas including:
-
-- Users
-- Products
-- Carts
-- Orders
-- Vendor Applications
-- Services
-- Appointments
-
-The product seed script inserts the initial product catalogue into MongoDB.
+| Collection | Purpose |
+|---|---|
+| Users | Accounts, roles, vendor/provider business details, suspension status |
+| Products | Catalogue, stock, ratings, moderation status |
+| Reviews | One review per customer per purchased product |
+| Carts | One server-side cart per user |
+| Orders | Orders with per-item fulfilment status and history |
+| Payments | Every payment attempt (card brand/last 4 only — never full card numbers) |
+| VendorApplications | Vendor and service-provider applications |
+| Services | Bookable vet/grooming services and their schedules |
+| Appointments | Bookings, linked to services and optionally a pet |
+| Pets | Pet profiles |
+| PetHealthRecords | One record per pet: vaccinations, conditions, notes |
 
 ---
 
@@ -285,50 +298,21 @@ Do not commit directly to `main` for feature development.
 
 ## Remaining Work
 
-The following areas are planned for the next development stage:
-
-### Reviews and Ratings
-
-- Product/service reviews
-- Rating system
-- Review storage
-- Display ratings and reviews
-
-### Pet Health Records
-
-- Pet profile management
-- Health record management
-- Vaccination records
-- Vaccination dates
-- Reminder functionality
-
-### Email Notifications
-
-- Nodemailer integration
-- Vaccination reminders
-- Relevant appointment or system notifications
-
-### Image Management
-
-- Cloudinary integration
-- Product image uploads
-- Replace temporary/stock image URLs with managed uploads
-
 ### Testing
 
-- Backend API tests
-- Authentication tests
-- Core business logic tests
+- Backend API tests (authentication, checkout and payments, order fulfilment, appointments)
 - Frontend/component testing where appropriate
 - Integration testing
 
 ### Deployment
 
-Planned deployment targets include:
+Planned deployment targets:
 
 - Frontend: Vercel
 - Backend: Render
 - Database: MongoDB Atlas
+
+Deployment notes (CORS origin, Atlas network access, SMTP, and the reminder job on free-tier hosts) are in [`backend/README.md`](backend/README.md#deployment-notes).
 
 ---
 
@@ -338,7 +322,7 @@ Planned deployment targets include:
 - The backend requires a valid MongoDB Atlas connection.
 - `backend/.env` contains local secrets and must never be committed.
 - Only `.env.example` files should be committed to GitHub.
-- Do not expose MongoDB credentials or JWT secrets in screenshots, documentation, commits, or public repositories.
+- Do not expose MongoDB credentials, JWT secrets, SMTP passwords or Cloudinary secrets in screenshots, documentation, commits, or public repositories.
 - There is currently no root-level build/lint/test command.
 - Run npm scripts from the relevant `frontend/` or `backend/` directory.
 
@@ -350,7 +334,7 @@ Planned deployment targets include:
 |---|---|
 | `frontend/README.md` | Frontend setup, routes, state management, styling and scripts |
 | `backend/README.md` | Backend setup, environment variables, API reference and data models |
-| `PROGRESS_REPORT.md` | Current implementation progress |
+| `PROGRESS_REPORT.md` | Interim (CA 02) progress report |
 | `projectDetails/` | Project-related documentation and supporting materials |
 
 ---

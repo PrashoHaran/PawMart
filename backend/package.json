@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "seed": "node src/scripts/seed.js"
+    "seed": "node src/scripts/seed.js",
+    "seed:services": "node src/scripts/seedServices.js",
+    "make-admin": "node src/scripts/promoteAdmin.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

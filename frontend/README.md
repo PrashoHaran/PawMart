@@ -20,16 +20,20 @@ React single-page app for [PawMart](../README.md), a pet marketplace app. Built 
 
 ## Overview
 
-The frontend is a plain-JavaScript (no TypeScript) React app built with Vite. It's a single-page app with client-side routing (`react-router-dom`) — one `Navbar`/`Footer` layout wraps every page. Authentication, the product catalog, cart, and checkout are wired to the real [backend API](../backend/README.md); a few pages (Smart Assistant, Appointment Booking, and the User/Vendor/Admin dashboards) are still self-contained UI mockups running on local hardcoded data, pending their own backend phase.
+The frontend is a plain-JavaScript (no TypeScript) React app built with Vite. It's a single-page app with client-side routing (`react-router-dom`) — one `Navbar`/`Footer` layout wraps every page. Every page is wired to the real [backend API](../backend/README.md); there are no mock-data pages left.
 
 ## Key Features
 
-- Browse and search the product marketplace with category filtering (debounced search, live against the API)
-- User registration/login with a persisted session (JWT stored in `localStorage`, restored on page reload)
-- Server-backed shopping cart (add/update/remove items) — cart actions require being logged in
-- Checkout flow with a shipping/payment form and an order confirmation screen
-- Responsive layout with a working mobile navigation menu
-- Accessible interactive elements (`aria-label`/`aria-pressed`/`aria-current` throughout, keyboard-focusable controls)
+- Marketplace with category filtering and debounced search; product pages with verified-purchase reviews and star ratings
+- Registration/login with a persisted session (JWT in `localStorage`, restored on reload); role-aware navbar (Vendor Portal and Admin links only for those roles)
+- Server-backed cart and checkout with a simulated card form (formatted inputs, per-field errors, test cards) or cash on delivery
+- User dashboard: overview with vaccine alerts, pets and health records (vaccination tracker), appointments with cancellation, order tracking with a progress indicator and cancellation
+- Appointment booking that shows each provider's open days and only free time slots
+- Smart Pet Care Assistant with breed suggestions, saved-pet prefill and a care plan (calories, weight gauge, breed care, vet watch-outs, product picks, sources)
+- Vendor dashboard (products, orders) and a Provider Portal for vets/groomers (services, bookings, stats)
+- Admin hub: platform alerts, orders, users, vendor verification, product moderation, appointments and analytics reports with charts
+- Cloudinary image uploads with preview (falls back to an image-URL field when uploads aren't configured)
+- Responsive layout (mobile menus and view switchers) and accessible controls (`aria-*` attributes, keyboard-focusable elements)
 - A small shared component-class design system (buttons, badges, alerts, cards) layered on Tailwind
 
 ## Tech Stack
@@ -51,20 +55,29 @@ No TypeScript — `@types/*` packages are dev-only, for editor autocomplete. Ful
 frontend/
 ├── index.html
 ├── src/
-│   ├── main.jsx                # Entry point — mounts <App/> wrapped in AuthProvider > CartProvider
+│   ├── main.jsx                 # Entry point — mounts <App/> wrapped in AuthProvider > CartProvider
 │   ├── App.jsx                  # Route definitions and the shared Navbar/Footer layout
-│   ├── index.css                 # Tailwind directives + shared component classes (@layer components)
+│   ├── index.css                # Tailwind directives + shared component classes (@layer components)
 │   ├── components/
-│   │   ├── Navbar.jsx            # Top nav — links, cart badge, auth-aware sign in/out, mobile menu
+│   │   ├── Navbar.jsx           # Top nav — role-aware links, cart badge, auth-aware sign in/out, mobile menu
 │   │   ├── Footer.jsx
-│   │   └── QuantityStepper.jsx    # Reusable +/- quantity control (used in Cart and Product Detail)
+│   │   ├── QuantityStepper.jsx  # Reusable +/- quantity control
+│   │   ├── ReviewSection.jsx    # Product reviews list, star picker and review form
+│   │   ├── ImageUploadField.jsx # Cloudinary upload with preview (or URL fallback)
+│   │   ├── ProductForm.jsx      # Add/edit product modal (vendor dashboard and admin catalogue)
+│   │   ├── dashboard/           # User dashboard tabs: pets, pet form, health panel, appointments, orders
+│   │   ├── orders/              # Order status helpers, progress indicator, vendor/admin order panel
+│   │   ├── provider/            # Provider Portal and service form
+│   │   └── admin/               # Admin panels: users, applications, products, appointments, reports
 │   ├── context/
-│   │   ├── AuthContext.jsx        # User/session state, login/register/logout, session restore on load
-│   │   └── CartContext.jsx        # Server-backed cart state and cart/checkout API calls
+│   │   ├── AuthContext.jsx      # User/session state, login/register/logout, session restore on load
+│   │   └── CartContext.jsx      # Server-backed cart state and cart/checkout API calls
 │   ├── lib/
-│   │   ├── api.js                 # Fetch wrapper: base URL, auth header, error envelope parsing, 401 handling
-│   │   └── format.js               # formatPriceCents() — cents → display string
-│   └── pages/                     # One component per route (see Routes table below)
+│   │   ├── api.js               # Fetch wrapper: base URL, auth header, error envelope parsing, 401 handling
+│   │   ├── format.js            # Prices (cents), calendar dates and ages
+│   │   ├── image.js             # Broken-image fallback and Cloudinary resizing (optimizedImage)
+│   │   └── upload.js            # Signed direct uploads to Cloudinary
+│   └── pages/                   # One component per route (see Routes table below)
 ├── public/
 ├── .env.example
 ├── tailwind.config.js
@@ -111,17 +124,18 @@ Declared in [`App.jsx`](src/App.jsx):
 | Path | Page Component | Notes |
 |---|---|---|
 | `/` | `Home.jsx` | Marketing landing page |
-| `/login` | `Login.jsx` | Combined sign-in/sign-up form, wired to the real auth API |
-| `/marketplace` | `Marketplace.jsx` | Product listing — fetched from the API, category filter + debounced search |
-| `/product/:id` | `ProductDetail.jsx` | Single product — fetched from the API |
-| `/cart` | `Cart.jsx` | Cart contents, shipping/payment form, checkout |
-| `/dashboard` | `UserDashboard.jsx` | ⚠️ Local mock data — no backend yet |
-| `/vendor-dashboard` | `VendorDashboard.jsx` | ⚠️ Local mock data — no backend yet |
-| `/assistant` | `SmartAssistant.jsx` | ⚠️ Local mock data — no backend yet |
-| `/book-appointment` | `AppointmentBooking.jsx` | ⚠️ Local mock data — no backend yet |
-| `/admin-dashboard` | `AdminDashboard.jsx` | ⚠️ Local mock data — no backend yet |
+| `/login` | `Login.jsx` | Combined sign-in/sign-up form |
+| `/marketplace` | `Marketplace.jsx` | Product listing with category filter and debounced search |
+| `/product/:id` | `ProductDetail.jsx` | Product details, reviews and review form |
+| `/cart` | `Cart.jsx` | Cart, shipping details, simulated payment and checkout |
+| `/dashboard` | `UserDashboard.jsx` | Overview, My Pets (health records), Appointments, Order History — tab kept in `?tab=` |
+| `/vendor-application` | `VendorApplication.jsx` | Apply to become a retail vendor or service provider |
+| `/vendor-dashboard` | `VendorDashboard.jsx` | Retail vendors: products and orders. Service providers: Provider Portal |
+| `/assistant` | `SmartAssistant.jsx` | Smart Pet Care Assistant (works signed out; saved pets when signed in) |
+| `/book-appointment` | `AppointmentBooking.jsx` | Service list with live slot availability |
+| `/admin-dashboard` | `AdminDashboard.jsx` | Admin hub |
 
-There are no route guards — every path is reachable regardless of login state. Pages that need auth (adding to cart, checkout) redirect to `/login` at the point of the action, not at the route level.
+Access is checked inside the pages rather than with route guards: `/dashboard` redirects to `/login` when signed out, `/vendor-dashboard` sends non-vendors to `/vendor-application`, and `/admin-dashboard` shows an "Admin access required" message to non-admins. Actions that need an account (adding to cart, booking) redirect to `/login` at the point of the action. The API enforces every permission regardless.
 
 ## State Management
 
@@ -132,7 +146,7 @@ No external state library (no Redux/Zustand/etc.) — just React Context:
 
 Both are provided once in `main.jsx` (`AuthProvider` wraps `CartProvider` wraps `App`) and consumed via the `useAuth()`/`useCart()` hooks.
 
-Pages that fetch their own data (Marketplace, ProductDetail) do so directly with `useEffect` + the `apiRequest()` helper from `src/lib/api.js`, using `AbortController` to cancel stale requests when filters change quickly.
+Pages and panels fetch their own data directly with `useEffect` + the `apiRequest()` helper from `src/lib/api.js` (using `AbortController` or an "active" flag to ignore stale responses). Admin list panels share a small `usePagedList` hook for filters and pagination.
 
 ## Styling System
 
@@ -175,6 +189,8 @@ There is no test suite configured in this project.
 - A 401 response from any request triggers a module-level "unauthorized" callback (registered by `AuthContext`) that clears the local session — there's no forced redirect, the UI just re-renders in its logged-out state.
 - **Adding to cart requires being logged in.** The backend's cart is entirely server-side per user (no anonymous/guest cart), so clicking "Add to Cart" while logged out sends the user to `/login` instead of silently failing or storing anything locally.
 - Money values from the API are integer cents (`priceCents`, `subtotalCents`, etc.) — always pass them through `formatPriceCents()` from `src/lib/format.js` before displaying.
+- Calendar dates (pet birthdays, vaccine dates) are stored as UTC midnight — display them with `formatDate()` (which formats in UTC) so they don't shift a day.
+- Image uploads go straight from the browser to Cloudinary using a signature from `POST /api/uploads/signature`; display Cloudinary images through `optimizedImage(url, width)` to load a resized version.
 
 ## Troubleshooting
 

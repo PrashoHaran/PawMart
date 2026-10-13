@@ -27,10 +27,18 @@ The backend exposes a JSON REST API under `/api`, backed by MongoDB Atlas. It fo
 
 ## Key Features
 
-- **Authentication** — email/password signup and login, JWT-based sessions, bcrypt password hashing
-- **Product catalog** — list with category/search filtering and pagination, fetch by ID
-- **Cart** — per-user, server-persisted cart with add/update/remove operations
-- **Checkout** — atomic stock validation and decrement per item, tax/shipping calculation, order creation, cart clearing
+- **Authentication & roles** — email/password signup and login, JWT sessions, bcrypt hashing; roles `customer`, `vendor` (retail or service provider) and `admin`; admins can suspend accounts
+- **Product catalog** — category/search filtering and pagination; admin moderation (hidden products) and PawMart's own "house" catalogue
+- **Reviews & ratings** — one review per verified purchaser; product rating and review count recalculated on every change
+- **Cart & checkout** — server-persisted cart; atomic stock checks and decrement; tax/shipping calculation
+- **Simulated payments** — a card gateway that validates card details and simulates declines with test cards; every attempt is recorded in `Payment` (brand and last 4 digits only)
+- **Order management** — per-item fulfilment (confirmed → processing → shipped → delivered) so each vendor fulfils their own items; customer cancellation with restock and refund; status-change emails
+- **Pets & health records** — pet profiles and one health record per pet with vaccinations (due/overdue status), conditions and notes
+- **Appointments** — provider-defined services with open days and time slots, live availability, no double-booking per provider, outcomes (completed / no-show / cancelled)
+- **Smart Pet Care Assistant** — rule-based plans: calories from Merck Veterinary Manual life-stage factors, breed profiles for 16 dog and 7 cat breeds, breed-matched product picks
+- **Notifications** — Nodemailer emails (order confirmation and status, booking confirmation and cancellation) and a daily `node-cron` vaccination reminder job
+- **Image uploads** — signed direct-to-Cloudinary uploads
+- **Admin tools** — users, applications, products, orders, appointments, platform alerts and analytics reports
 - **Validation** — every request body/query is validated with [Zod](https://zod.dev) before it reaches a controller
 - **Security baseline** — Helmet security headers, CORS restricted to the frontend origin, rate limiting (tighter on auth routes)
 - **Consistent error handling** — a single error-handling middleware maps Mongo/validation/custom errors to the right HTTP status and a uniform JSON shape
@@ -46,6 +54,9 @@ The backend exposes a JSON REST API under `/api`, backed by MongoDB Atlas. It fo
 | Auth | [jsonwebtoken](https://github.com/auth0/node-jsonwebtoken), [bcryptjs](https://github.com/dcodeIO/bcrypt.js) |
 | Validation | [Zod](https://zod.dev) |
 | Security | [Helmet](https://helmetjs.github.io/), [cors](https://github.com/expressjs/cors), [express-rate-limit](https://github.com/express-rate-limit/express-rate-limit) |
+| Email | [Nodemailer](https://nodemailer.com/) |
+| Scheduled jobs | [node-cron](https://github.com/node-cron/node-cron) |
+| Image hosting | [Cloudinary](https://cloudinary.com/) (signed uploads; no SDK needed) |
 | Logging | [morgan](https://github.com/expressjs/morgan) |
 | Config | [dotenv](https://github.com/motdotla/dotenv) |
 | Dev tooling | [nodemon](https://nodemon.io/) |
@@ -56,28 +67,49 @@ Full dependency list and versions: [package.json](package.json).
 
 ```
 backend/
-├── server.js                  # Entry point: connects DB, starts the HTTP server, handles graceful shutdown
+├── server.js                  # Entry point: connects DB, verifies mail, schedules jobs, starts HTTP server, graceful shutdown
 ├── src/
 │   ├── app.js                 # Express app assembly (middleware, routes, error handlers) — no listen()
 │   ├── config/
-│   │   ├── env.js             # Loads and validates required environment variables
+│   │   ├── env.js             # Loads and validates environment variables (required + optional features)
 │   │   └── db.js              # Mongoose connection with retry logic and connection event logging
-│   ├── models/                # Mongoose schemas: User, Product, Cart, Order
-│   ├── controllers/           # Route handler logic (one file per resource)
+│   ├── models/                # User, Product, Review, Cart, Order, Payment, VendorApplication,
+│   │                          # Service, Appointment, Pet, PetHealthRecord
+│   ├── controllers/           # Route handler logic (one file per resource; admin split into
+│   │                          # admin.controller.js and adminManage.controller.js)
 │   ├── routes/                # Express routers (one file per resource) + routes/index.js mounting them
 │   ├── middleware/
-│   │   ├── auth.js            # requireAuth — verifies JWT and attaches req.user
+│   │   ├── auth.js            # requireAuth — verifies JWT, rejects suspended users, attaches req.user
+│   │   ├── role.js            # requireRole(...roles), requireServiceProvider
 │   │   ├── validate.js        # validateBody / validateQuery (Zod) / validateObjectId
 │   │   ├── errorHandler.js    # Centralized error handler + 404 handler
 │   │   └── rateLimiter.js     # apiLimiter (general) and authLimiter (stricter, login/register)
 │   ├── validators/            # Zod schemas, one per resource
+│   ├── services/
+│   │   ├── mailer.js           # Nodemailer transport (SMTP, or console logging when unconfigured)
+│   │   ├── emailTemplates.js   # HTML + text emails (orders, appointments, vaccination reminders)
+│   │   ├── paymentGateway.js   # Simulated card processor (Luhn/expiry/CVC checks, test decline cards)
+│   │   ├── orderFulfilment.js  # Order status rules, cancellation, restock and refunds
+│   │   └── appointmentStatus.js # Shared provider/admin booking outcome rules
+│   ├── jobs/
+│   │   └── vaccinationReminders.js # Daily node-cron job (also callable on demand by admins)
+│   ├── data/
+│   │   └── breedProfiles.js    # Smart Assistant breed knowledge, with sources
 │   ├── utils/
-│   │   ├── ApiError.js        # Typed error class with status/code helpers
-│   │   ├── ApiResponse.js     # sendData() — writes the { data, meta } success envelope
-│   │   └── asyncHandler.js    # Wraps async route handlers so rejected promises reach the error handler
+│   │   ├── ApiError.js         # Typed error class with status/code helpers
+│   │   ├── ApiResponse.js      # sendData() — writes the { data, meta } success envelope
+│   │   ├── asyncHandler.js     # Wraps async route handlers so rejected promises reach the error handler
+│   │   ├── petAssistantRules.js # Calorie maths, breed matching, product picks
+│   │   ├── vaccineStatus.js    # Due / overdue / superseded vaccination logic
+│   │   ├── appointmentTime.js  # Time-slot parsing in APP_UTC_OFFSET, schedules
+│   │   ├── visibility.js       # Public filters (hidden products, suspended sellers)
+│   │   ├── cloudinary.js       # Upload signatures
+│   │   └── businessType.js     # Backfills vendor/provider type for older accounts
 │   └── scripts/
-│       └── seed.js            # Populates the product catalog with starter data
-├── .env.example                # Template for required environment variables
+│       ├── seed.js             # Populates the product catalog with starter data
+│       ├── seedServices.js     # Creates the PawMart Clinic services
+│       └── promoteAdmin.js     # Makes an existing user an admin
+├── .env.example                # Template for environment variables
 └── package.json
 ```
 
@@ -151,15 +183,19 @@ For local testing without a real mailbox, leave `SMTP_HOST` empty (emails go to 
 ## Running the Project
 
 ```bash
-npm run dev      # start with nodemon (auto-restarts on file changes)
-npm run seed      # populate the product catalog (run once, or after wiping the DB)
-npm run start      # start without nodemon (e.g. in production)
+npm run dev             # start with nodemon (auto-restarts on file changes)
+npm run seed            # populate the product catalog (run once, or after wiping the DB)
+npm run seed:services   # create the PawMart Clinic vet/grooming services
+npm run make-admin -- you@example.com   # make an existing (registered) user an admin
+npm run start           # start without nodemon (e.g. in production)
 ```
 
 On successful startup you should see:
 
 ```
 [mongo] connected
+[mail] SMTP_HOST not set — emails will be logged to the console, not sent
+[reminders] scheduled "0 8 * * *" (Asia/Colombo)
 [server] listening on port 5000
 ```
 
@@ -263,47 +299,113 @@ All order routes require authentication.
 
 | Method | Endpoint | Body | Description |
 |---|---|---|---|
-| POST | `/api/orders` | `{ shippingAddress, paymentMethod }` | Check out the current cart — creates an order, decrements stock, clears the cart |
-| GET | `/api/orders` | — | List the current user's orders |
+| POST | `/api/orders` | `{ shippingAddress, paymentMethod, card? }` | Check out the current cart — charges the card (simulated), creates the order and payment, decrements stock, clears the cart |
+| GET | `/api/orders` | — | List the current user's orders, each with its payment summary |
 | GET | `/api/orders/:id` | — | Get a single order (must belong to the current user) |
+| POST | `/api/orders/:id/cancel` | — | Cancel before anything has shipped — restocks items and refunds card payments |
 
-`paymentMethod` is one of `credit_card` or `cash_on_delivery`. `shippingAddress` requires `firstName`, `lastName`, `address`, `city`, `postalCode`.
+`paymentMethod` is `credit_card` or `cash_on_delivery`. Card payments need `card: { number, expiry: "MM/YY", cvc }`. Malformed card details return `400` with per-field `details`; a declined card returns `402 PAYMENT_DECLINED`, restocks everything, keeps the cart and records a failed `Payment` so the customer can retry. Test cards: `4242 4242 4242 4242` (approved), `4000 0000 0000 0002` (declined), `4000 0000 0000 9995` (insufficient funds), `4000 0000 0000 0069` (expired), `4000 0000 0000 0127` (incorrect CVC).
 
-Checkout re-validates stock for every cart item and atomically decrements it (`stock >= quantity` guard on the update). If any item is short, already-decremented items from the same request are rolled back and the request fails with `409 CONFLICT` — no partial orders are created.
+Checkout re-validates stock for every cart item and atomically decrements it (`stock >= quantity` guard on the update). If any item is short, already-decremented items from the same request are rolled back and the request fails with `409 CONFLICT` — no partial orders are created. Products that have been hidden, or whose seller is suspended, also block checkout with `409` until they are removed from the cart.
+
+**Fulfilment:** each order item has its own status (`confirmed → processing → shipped → delivered`, or `cancelled`), so an order with products from several vendors can be fulfilled independently; the order's status is its least advanced item. Vendors move their own items one step at a time (`PATCH /api/vendor/orders/:id/status`); admins can move any order forward or cancel it (`PATCH /api/admin/orders/:id/status`). Cash-on-delivery payments are marked collected on delivery. Customers are emailed when an order ships, is delivered or is cancelled.
 
 ### Full Endpoint Summary
 
-| Method | Endpoint | Auth Required |
-|---|---|:---:|
-| POST | `/api/auth/register` | ✗ |
-| POST | `/api/auth/login` | ✗ |
-| GET | `/api/auth/me` | ✓ |
-| GET | `/api/products` | ✗ |
-| GET | `/api/products/:id` | ✗ |
-| GET | `/api/cart` | ✓ |
-| POST | `/api/cart/items` | ✓ |
-| PATCH | `/api/cart/items/:productId` | ✓ |
-| DELETE | `/api/cart/items/:productId` | ✓ |
-| DELETE | `/api/cart` | ✓ |
-| POST | `/api/orders` | ✓ |
-| GET | `/api/orders` | ✓ |
-| GET | `/api/orders/:id` | ✓ |
-| GET | `/health` | ✗ |
+Auth: ✗ public · ✓ any signed-in user · **V** vendor · **SP** service provider · **A** admin.
+
+| Method | Endpoint | Auth | Description |
+|---|---|:---:|---|
+| POST | `/api/auth/register` | ✗ | Create an account |
+| POST | `/api/auth/login` | ✗ | Log in (suspended accounts get `403`) |
+| GET | `/api/auth/me` | ✓ | Current user |
+| GET | `/api/products` | ✗ | List visible products (`?category=&search=&page=&limit=`) |
+| GET | `/api/products/:id` | ✗ | Product details |
+| GET | `/api/products/:id/reviews` | ✗ | Reviews, newest first (`?page=&limit=`) |
+| GET | `/api/products/:id/reviews/eligibility` | ✓ | Whether the current user can review, and why not |
+| POST | `/api/products/:id/reviews` | ✓ customer | `{ rating 1–5, comment? }` — buyers only, once per product |
+| DELETE | `/api/reviews/:reviewId` | ✓ | Author or admin |
+| GET | `/api/cart` | ✓ | Current cart |
+| POST | `/api/cart/items` | ✓ | Add item `{ productId, quantity }` |
+| PATCH | `/api/cart/items/:productId` | ✓ | Set quantity `{ quantity }` |
+| DELETE | `/api/cart/items/:productId` | ✓ | Remove item |
+| DELETE | `/api/cart` | ✓ | Empty cart |
+| POST | `/api/orders` | ✓ | Checkout (see [Orders](#orders)) |
+| GET | `/api/orders` | ✓ | My orders |
+| GET | `/api/orders/:id` | ✓ | One of my orders |
+| POST | `/api/orders/:id/cancel` | ✓ | Cancel before shipping |
+| GET | `/api/pets` | ✓ | My pets, each with a vaccination summary |
+| POST | `/api/pets` | ✓ | Create a pet |
+| GET | `/api/pets/:id` | ✓ | Pet + health record (vaccinations annotated with status) |
+| PATCH | `/api/pets/:id` | ✓ | Update a pet |
+| DELETE | `/api/pets/:id` | ✓ | Delete a pet and its health record |
+| PATCH | `/api/pets/:id/health` | ✓ | Update `{ conditions[], medicalNotes }` |
+| POST | `/api/pets/:id/vaccinations` | ✓ | Add `{ name, dateGiven, nextDueDate?, vetName?, notes? }` |
+| PUT | `/api/pets/:id/vaccinations/:vaccinationId` | ✓ | Replace a vaccination |
+| DELETE | `/api/pets/:id/vaccinations/:vaccinationId` | ✓ | Delete a vaccination |
+| GET | `/api/services` | ✗ | Bookable services with provider name, open days and slots |
+| GET | `/api/services/:id/availability` | ✗ | Open/booked/past slots for `?date=YYYY-MM-DD` |
+| GET | `/api/appointments` | ✓ | My appointments |
+| POST | `/api/appointments` | ✓ | Book `{ serviceId, date, timeSlotLabel, petId?, petDescription, notes? }` |
+| PATCH | `/api/appointments/:id/cancel` | ✓ | Cancel an upcoming booking |
+| GET | `/api/pet-assistant/breeds` | ✗ | Breeds with specific advice (`?species=dog\|cat`) |
+| POST | `/api/pet-assistant/recommend` | ✗ | Care plan `{ petType, breed?, ageYears, weightKg, activityLevel, neutered?, allergies? }` |
+| GET | `/api/uploads/config` | ✓ | Whether Cloudinary uploads are enabled |
+| POST | `/api/uploads/signature` | ✓ | Upload signature `{ purpose: "product" \| "pet" }` (product: vendors/admins) |
+| POST | `/api/vendor-applications` | ✓ | Apply `{ businessName, businessType: retail_vendor \| service_provider }` |
+| GET | `/api/vendor-applications/me` | ✓ | My latest application |
+| GET | `/api/vendor-applications` | A | Pending applications |
+| POST | `/api/vendor-applications/:id/approve` | A | Approve (user becomes a vendor of that type) |
+| POST | `/api/vendor-applications/:id/reject` | A | Reject |
+| GET | `/api/vendor/stats` | V | Sales, order count, active products |
+| GET/POST | `/api/vendor/products` | V | List / create my products |
+| PATCH/DELETE | `/api/vendor/products/:id` | V | Update / delete my product |
+| GET | `/api/vendor/orders` | V | Orders containing my products (`?status=&page=&limit=`) |
+| PATCH | `/api/vendor/orders/:id/status` | V | Move my items to the next status |
+| GET | `/api/provider/stats` | SP | Upcoming, completed, earnings, active services |
+| GET/POST | `/api/provider/services` | SP | List / create my services |
+| PATCH/DELETE | `/api/provider/services/:id` | SP | Update / remove (hidden if it has history) |
+| GET | `/api/provider/appointments` | SP | Bookings (`?scope=upcoming\|past\|all`) |
+| PATCH | `/api/provider/appointments/:id/status` | SP | `completed` / `no_show` after start; `cancelled` (with `reason`) before |
+| GET | `/api/admin/stats` | A | Platform totals and alerts |
+| GET | `/api/admin/reports` | A | Analytics for `?days=7\|30\|90\|365` |
+| POST | `/api/admin/reminders/vaccinations/run` | A | Send due vaccination reminders now |
+| GET | `/api/admin/users` | A | Users (`?search=&role=&status=&page=&limit=`) |
+| PATCH | `/api/admin/users/:id/status` | A | Suspend `{ status: "suspended", reason }` or reactivate |
+| PATCH | `/api/admin/users/:id/role` | A | Appoint/remove admin `{ role: "admin" \| "customer" }` |
+| GET | `/api/admin/vendor-applications` | A | All applications (`?status=`) |
+| GET/POST | `/api/admin/products` | A | All products (`?search=&owner=&visibility=`) / create a house product |
+| PATCH/DELETE | `/api/admin/products/:id` | A | Update / delete a house product |
+| PATCH | `/api/admin/products/:id/visibility` | A | Hide `{ hidden: true, reason }` or unhide |
+| GET | `/api/admin/orders` | A | All orders (`?status=&page=&limit=`) |
+| PATCH | `/api/admin/orders/:id/status` | A | Advance or cancel any order |
+| GET | `/api/admin/appointments` | A | All bookings (`?scope=&owner=clinic`) |
+| PATCH | `/api/admin/appointments/:id/status` | A | Booking outcome / cancellation |
+| GET | `/health` | ✗ | Health check |
 
 ## Data Models
 
 | Model | Key Fields |
 |---|---|
-| **User** | `name`, `email` (unique), `passwordHash`, `role` (`customer` \| `vendor` \| `admin`, default `customer`), `tokenVersion` |
-| **Product** | `name`, `priceCents`, `rating`, `category`, `image`, `description`, `features[]`, `vendorName`, `stock` |
+| **User** | `name`, `email` (unique), `passwordHash`, `role` (`customer` \| `vendor` \| `admin`), `businessName`, `businessType` (`retail_vendor` \| `service_provider`), `status` (`active` \| `suspended`), `suspendReason`, `tokenVersion` |
+| **Product** | `name`, `priceCents`, `rating`, `reviewCount`, `category`, `image`, `description`, `features[]`, `vendorName`, `vendorId` (null = PawMart house product), `stock`, `hidden`, `hiddenReason` |
+| **Review** | `productId`, `userId` (unique together), `userName`, `rating` (1–5), `comment` |
 | **Cart** | `userId` (unique — one cart per user), `items: [{ product, quantity }]` |
-| **Order** | `userId`, `items: [{ product, name, priceCents, quantity }]` (price snapshot at purchase time), `subtotalCents`, `taxCents`, `shippingCents`, `totalCents`, `status`, `shippingAddress`, `paymentMethod` |
+| **Order** | `userId`, `items: [{ product, vendorId, name, priceCents, quantity, status }]`, `subtotalCents`, `taxCents`, `shippingCents`, `totalCents`, `status`, `statusHistory[]`, `shippingAddress`, `paymentMethod`, `paymentId` |
+| **Payment** | `userId`, `orderId` (null for failed attempts), `method`, `amountCents`, `status` (`pending` \| `succeeded` \| `failed` \| `refunded` \| `cancelled`), `card: { brand, last4, expMonth, expYear }`, `transactionRef`, `failureCode` |
+| **VendorApplication** | `userId`, `businessName`, `businessType`, `status`, `reviewedBy`, `reviewedAt` |
+| **Service** | `name`, `type` (`vet` \| `grooming`), `durationMinutes`, `priceCents`, `providerId` (null = PawMart Clinic), `timeSlots[]`, `availableDays[]`, `active` |
+| **Appointment** | `userId`, `service`, `petId`, `petDescription`, `scheduledAt`, `timeSlotLabel`, `notes`, `status` (`booked` \| `completed` \| `no_show` \| `cancelled`), `cancelledBy`, `cancelReason` |
+| **Pet** | `ownerId`, `name`, `species`, `breed`, `sex`, `birthDate`, `weightKg`, `allergies[]`, `photoUrl` |
+| **PetHealthRecord** | `petId` (unique — one per pet), `ownerId`, `vaccinations: [{ name, dateGiven, nextDueDate, vetName, notes, reminderSentFor }]`, `conditions[]`, `medicalNotes` |
 
 Full field definitions with types, defaults, and indexes are in `src/models/`. Notes:
 
 - Passwords are never returned in API responses (`User.toJSON` strips `passwordHash`).
-- `Order.items` stores a **snapshot** of the product name/price at checkout time — it doesn't change if the product is later edited or deleted.
+- `Order.items` stores a **snapshot** of the product name/price (and vendor) at checkout time — it doesn't change if the product is later edited or deleted.
+- Full card numbers and CVCs are never stored.
 - Tax is calculated as 8% of the subtotal; shipping is a flat $5.99 (`599` cents) unless the subtotal exceeds $50 (`5000` cents), in which case it's free.
+- Calendar dates (birthdays, vaccine dates) are stored as UTC midnight; appointment times are interpreted in `APP_UTC_OFFSET`.
 
 ## Error Handling
 
@@ -312,12 +414,14 @@ All errors — thrown `ApiError`s, Mongoose validation errors, invalid ObjectId 
 | Status | Code | Typical Cause |
 |---|---|---|
 | 400 | `VALIDATION_ERROR` | Zod validation failure, invalid ObjectId, Mongoose validation error |
-| 401 | `UNAUTHORIZED` | Missing/invalid/expired token |
-| 403 | `FORBIDDEN` | (reserved for future role-based checks) |
+| 401 | `UNAUTHORIZED` | Missing/invalid/expired token, or the account was suspended |
+| 402 | `PAYMENT_DECLINED` | Simulated card declined at checkout |
+| 403 | `FORBIDDEN` | Wrong role, not the owner, suspended account at login, or a rule such as "only buyers can review" |
 | 404 | `NOT_FOUND` | Resource not found, or an unmatched route |
-| 409 | `CONFLICT` | Duplicate email on register, insufficient stock at checkout |
+| 409 | `CONFLICT` | Duplicate email, insufficient stock, unavailable cart item, slot already booked, invalid status change |
 | 429 | `RATE_LIMITED` | Too many requests |
 | 500 | `INTERNAL_ERROR` | Unhandled server error |
+| 503 | `UPLOADS_DISABLED` | Upload signature requested but Cloudinary isn't configured |
 
 ## Security
 
@@ -336,10 +440,12 @@ All errors — thrown `ApiError`s, Mongoose validation errors, invalid ObjectId 
 | `npm run dev` | Start the server with `nodemon` (auto-restart on changes) |
 | `npm run start` | Start the server directly with `node` |
 | `npm run seed` | Wipe and repopulate the `Product` collection with starter catalog data |
+| `npm run seed:services` | Wipe and recreate the services collection with the PawMart Clinic services |
+| `npm run make-admin -- <email>` | Give an existing user the admin role (they must log in again) |
 
 ## Deployment Notes
 
-There is no deployment configuration (Dockerfile, CI/CD, hosting-specific config) in this repo yet — the project has been run locally against MongoDB Atlas only. If deploying:
+There is no deployment configuration (Dockerfile, CI/CD, hosting-specific config) in this repo yet — the project has been run locally against MongoDB Atlas only. The planned targets are Render (backend) and Vercel (frontend). If deploying:
 
 - Set `MONGODB_URI`, `JWT_SECRET`, and `FRONTEND_URL` (pointing at the deployed frontend origin) as real environment variables on the host — never commit `.env`.
 - Use `npm run start` (not `dev`) in production.
@@ -357,4 +463,8 @@ There is no deployment configuration (Dockerfile, CI/CD, hosting-specific config
 | Connection hangs / times out | Your current IP isn't in Atlas's Network Access list |
 | `401 Unauthorized` on a route you just logged in for | Token wasn't sent (`Authorization: Bearer <token>` header), has expired (1-day lifetime), or the user's `tokenVersion` changed since the token was issued |
 | CORS error in the browser console | `FRONTEND_URL` in `.env` doesn't match the origin the frontend is actually running on |
-| `409 CONFLICT` on checkout | A cart item's quantity exceeds current stock — re-fetch the cart/product to see live stock |
+| `409 CONFLICT` on checkout | A cart item's quantity exceeds current stock, or an item was hidden/its seller suspended — the message names the item |
+| `402 PAYMENT_DECLINED` on checkout | A simulated decline test card was used — try `4242 4242 4242 4242` |
+| No emails arrive | `SMTP_HOST` isn't set (emails are printed in the server console), or the SMTP credentials are wrong — the startup log says which |
+| Upload button missing, only an image-URL field | Cloudinary variables aren't set (`GET /api/uploads/config` returns `enabled: false`) |
+| Appointment times look 5½ hours off | `APP_UTC_OFFSET` doesn't match where your customers are (default `+05:30`) |
