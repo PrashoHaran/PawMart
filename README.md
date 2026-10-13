@@ -62,6 +62,7 @@ PawMart/
 ├── backend/               # Node.js + Express + MongoDB Atlas REST API
 ├── projectDetails/        # Project-related documentation/materials
 ├── Group_17.md            # Group/project information
+├── PROJECT_REPORT.md      # Full project report
 ├── PROGRESS_REPORT.md     # Interim (CA 02) progress report
 ├── README.md              # Project overview and setup
 └── .gitignore
@@ -334,6 +335,7 @@ Deployment notes (CORS origin, Atlas network access, SMTP, and the reminder job 
 |---|---|
 | `frontend/README.md` | Frontend setup, routes, state management, styling and scripts |
 | `backend/README.md` | Backend setup, environment variables, API reference and data models |
+| `PROJECT_REPORT.md` | Full project report: architecture, tech stack, modules, data model, security, testing |
 | `PROGRESS_REPORT.md` | Interim (CA 02) progress report |
 | `projectDetails/` | Project-related documentation and supporting materials |
 
