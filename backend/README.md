@@ -51,7 +51,7 @@ The backend exposes a JSON REST API under `/api`, backed by MongoDB Atlas. It fo
 | Framework | [Express](https://expressjs.com/) 4 |
 | Database | MongoDB Atlas |
 | ODM | [Mongoose](https://mongoosejs.com/) 8 |
-| Auth | [jsonwebtoken](https://github.com/auth0/node-jsonwebtoken), [bcryptjs](https://github.com/dcodeIO/bcrypt.js) |
+| Auth | [jsonwebtoken](https://github.com/auth0/node-jsonwebtoken), [bcryptjs](https://github.com/dcodeIO/bcrypt.js), [google-auth-library](https://github.com/googleapis/google-auth-library-nodejs) (Google sign-in) |
 | Validation | [Zod](https://zod.dev) |
 | Security | [Helmet](https://helmetjs.github.io/), [cors](https://github.com/expressjs/cors), [express-rate-limit](https://github.com/express-rate-limit/express-rate-limit) |
 | Email | [Nodemailer](https://nodemailer.com/) |
@@ -90,6 +90,7 @@ backend/
 │   │   ├── emailTemplates.js   # HTML + text emails (orders, appointments, vaccination reminders)
 │   │   ├── paymentGateway.js   # Simulated card processor (Luhn/expiry/CVC checks, test decline cards)
 │   │   ├── paypal.js           # PayPal REST client (OAuth, create/capture orders, refunds)
+│   │   ├── googleAuth.js       # Verifies "Sign in with Google" ID tokens
 │   │   ├── orderFulfilment.js  # Order status rules, cancellation, restock and refunds
 │   │   └── appointmentStatus.js # Shared provider/admin booking outcome rules
 │   ├── jobs/
@@ -151,6 +152,7 @@ Defined in [`.env.example`](.env.example). Copy it to `.env` (gitignored) and fi
 | `JWT_SECRET` | **Yes** | — | Secret used to sign/verify JWTs — use a long random string |
 | `FRONTEND_URL` | No | `http://localhost:5173` | Origin allowed by CORS (the Vite dev server by default); also used for links in emails |
 | `APP_UTC_OFFSET` | No | `+05:30` | Timezone offset appointment time slots are interpreted in, independent of the server's own timezone |
+| `GOOGLE_CLIENT_ID` | No | — | Enables "Continue with Google". If unset, only email/password login is shown |
 | `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` | No | — | Enables PayPal Checkout. If unset, PayPal isn't offered |
 | `PAYPAL_ENV` | No | `sandbox` | `sandbox` (test money) or `live` |
 | `PAYPAL_SHIPPING_COUNTRY` | No | `LK` | Country code sent to PayPal with the checkout shipping address |
@@ -174,6 +176,16 @@ Uploads go **directly from the browser to Cloudinary** using signed uploads, so 
 3. The browser uploads the file to Cloudinary and saves the returned `secure_url` on the product or pet.
 
 `GET /api/uploads/config` tells the frontend whether uploads are enabled. Cloudinary images are displayed with delivery transformations (`c_limit,w_<n>,f_auto,q_auto`) so each view loads a resized, compressed version. The 5 MB size limit is checked in the browser; to enforce it on Cloudinary's side as well, create a signed upload preset with a max file size.
+
+### Sign in with Google
+
+When `GOOGLE_CLIENT_ID` is set, the login page shows Google's official **Continue with Google** button (Google Identity Services).
+
+1. The browser gets a signed **ID token** from Google and sends it to `POST /api/auth/google` `{ credential }`.
+2. The server verifies it with Google's official [`google-auth-library`](https://github.com/googleapis/google-auth-library-nodejs) (`verifyIdToken` checks signature, expiry, issuer and that the audience is PawMart's client ID) and requires a verified email.
+3. The user is found by Google account ID (`sub`) — never by email alone — or created as a customer (no password), and PawMart issues its normal JWT, so roles, suspension and dashboards work unchanged.
+
+**Account linking:** if a password account already has that email, it is linked only when Google is authoritative for the address (`@gmail.com`, or a Google Workspace domain — the token's `hd` claim); otherwise the user must sign in with their password (`409`). Password login on a Google-only account returns a message pointing to Google sign-in. Only the public client ID is needed — no client secret. `GET /api/auth/config` tells the frontend whether Google sign-in is enabled. Setup steps: [GOOGLE_SETUP.md](../GOOGLE_SETUP.md).
 
 ### PayPal Checkout (sandbox)
 
@@ -341,6 +353,8 @@ Auth: ✗ public · ✓ any signed-in user · **V** vendor · **SP** service pro
 | POST | `/api/auth/register` | ✗ | Create an account |
 | POST | `/api/auth/login` | ✗ | Log in (suspended accounts get `403`) |
 | GET | `/api/auth/me` | ✓ | Current user |
+| GET | `/api/auth/config` | ✗ | Sign-in options (Google enabled, public client ID) |
+| POST | `/api/auth/google` | ✗ | Sign in / sign up with a Google ID token `{ credential }` |
 | GET | `/api/products` | ✗ | List visible products (`?category=&search=&page=&limit=`) |
 | GET | `/api/products/:id` | ✗ | Product details |
 | GET | `/api/products/:id/reviews` | ✗ | Reviews, newest first (`?page=&limit=`) |
@@ -413,7 +427,7 @@ Auth: ✗ public · ✓ any signed-in user · **V** vendor · **SP** service pro
 
 | Model | Key Fields |
 |---|---|
-| **User** | `name`, `email` (unique), `passwordHash`, `role` (`customer` \| `vendor` \| `admin`), `businessName`, `businessType` (`retail_vendor` \| `service_provider`), `status` (`active` \| `suspended`), `suspendReason`, `tokenVersion` |
+| **User** | `name`, `email` (unique), `passwordHash` (absent for Google-only accounts), `googleId` (unique, sparse), `avatarUrl`, `role` (`customer` \| `vendor` \| `admin`), `businessName`, `businessType` (`retail_vendor` \| `service_provider`), `status` (`active` \| `suspended`), `suspendReason`, `tokenVersion` |
 | **Product** | `name`, `priceCents`, `rating`, `reviewCount`, `category`, `image`, `description`, `features[]`, `vendorName`, `vendorId` (null = PawMart house product), `stock`, `hidden`, `hiddenReason` |
 | **Review** | `productId`, `userId` (unique together), `userName`, `rating` (1–5), `comment` |
 | **Cart** | `userId` (unique — one cart per user), `items: [{ product, quantity }]` |
@@ -448,7 +462,7 @@ All errors — thrown `ApiError`s, Mongoose validation errors, invalid ObjectId 
 | 429 | `RATE_LIMITED` | Too many requests |
 | 500 | `INTERNAL_ERROR` | Unhandled server error |
 | 502 | `PAYPAL_ERROR` / `PAYPAL_UNAVAILABLE` / `PAYPAL_REFUND_FAILED` | PayPal rejected a request or couldn't be reached (check the PayPal credentials) |
-| 503 | `UPLOADS_DISABLED` / `PAYPAL_DISABLED` | Feature requested but not configured on this server |
+| 503 | `UPLOADS_DISABLED` / `PAYPAL_DISABLED` / `GOOGLE_DISABLED` | Feature requested but not configured on this server |
 
 ## Security
 
@@ -492,6 +506,8 @@ There is no deployment configuration (Dockerfile, CI/CD, hosting-specific config
 | CORS error in the browser console | `FRONTEND_URL` in `.env` doesn't match the origin the frontend is actually running on |
 | `409 CONFLICT` on checkout | A cart item's quantity exceeds current stock, or an item was hidden/its seller suspended — the message names the item |
 | `402 PAYMENT_DECLINED` on checkout | A simulated decline test card was used — try `4242 4242 4242 4242` (for PayPal, the sandbox funding source was declined; choose another in the popup) |
+| No Google button on the login page | `GOOGLE_CLIENT_ID` isn't set — `GET /api/auth/config` returns `enabled: false` |
+| Google popup shows `origin_mismatch` | The frontend URL isn't in the client's **Authorized JavaScript origins** — add `http://localhost` and `http://localhost:5173` (see [GOOGLE_SETUP.md](../GOOGLE_SETUP.md)) |
 | No PayPal option at checkout | `PAYPAL_CLIENT_ID`/`PAYPAL_CLIENT_SECRET` aren't set — the startup log says `[paypal] not configured` |
 | PayPal popup shows "Things don't seem to be going well" | The app's sandbox business (seller) account can't receive payments (e.g. registered in Sri Lanka), or you logged in with the business account — use a US business account for the app and the personal account in the popup |
 | PayPal popup says the client ID is invalid | The Client ID/Secret are from a **live** app while `PAYPAL_ENV=sandbox` (or vice versa) |

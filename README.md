@@ -33,6 +33,7 @@ PawMart is feature-complete against the original proposal and running end-to-end
 | Area | Status |
 |---|---|
 | Authentication (register/login/session) | ✅ Implemented |
+| Sign in with Google | ✅ Implemented |
 | Role-based authorization (customer / vendor / service provider / admin) | ✅ Implemented |
 | Product marketplace, search and category filtering | ✅ Implemented |
 | Product details | ✅ Implemented |
@@ -63,6 +64,7 @@ PawMart/
 ├── backend/               # Node.js + Express + MongoDB Atlas REST API
 ├── projectDetails/        # Project-related documentation/materials
 ├── Group_17.md            # Group/project information
+├── GOOGLE_SETUP.md        # Google sign-in setup guide
 ├── PAYPAL_SETUP.md        # PayPal sandbox setup guide
 ├── PROJECT_REPORT.md      # Full project report
 ├── PROGRESS_REPORT.md     # Interim (CA 02) progress report
@@ -81,7 +83,7 @@ PawMart/
 | Frontend | React 19, Vite, React Router, Tailwind CSS, lucide-react |
 | Backend | Node.js, Express, Mongoose, Zod validation |
 | Database | MongoDB Atlas |
-| Authentication | JWT + bcrypt |
+| Authentication | JWT + bcrypt, Sign in with Google (Google Identity Services) |
 | Image hosting | Cloudinary (signed direct uploads) |
 | Email | Nodemailer (SMTP) |
 | Background jobs | node-cron (daily vaccination reminders) |
@@ -94,7 +96,7 @@ PawMart/
 
 ### Customer / Pet Owner
 
-- Register, log in, and stay signed in across page reloads
+- Register, log in (email/password or **Continue with Google**), and stay signed in across page reloads
 - Browse, search and filter products; view product details
 - Read reviews, and leave a star rating and review after buying a product
 - Server-persisted cart and checkout with shipping details
@@ -201,6 +203,7 @@ Everything else is optional and has a safe fallback:
 | Setting | Without it |
 |---|---|
 | `SMTP_*`, `EMAIL_FROM` | Emails are printed to the backend console instead of sent |
+| `GOOGLE_CLIENT_ID` | No Google button on the login page (email/password still works) — see [GOOGLE_SETUP.md](GOOGLE_SETUP.md) |
 | `PAYPAL_*` | PayPal isn't offered at checkout (card and cash still work) |
 | `CLOUDINARY_*` | Image fields fall back to pasting an image URL |
 | `REMINDER_*` | Vaccination reminders run daily at 08:00 Sri Lanka time |
@@ -347,6 +350,7 @@ Deployment notes (CORS origin, Atlas network access, SMTP, and the reminder job 
 |---|---|
 | `frontend/README.md` | Frontend setup, routes, state management, styling and scripts |
 | `backend/README.md` | Backend setup, environment variables, API reference and data models |
+| `GOOGLE_SETUP.md` | Step-by-step Google sign-in setup and troubleshooting |
 | `PAYPAL_SETUP.md` | Step-by-step PayPal sandbox setup and troubleshooting |
 | `PROJECT_REPORT.md` | Full project report: architecture, tech stack, modules, data model, security, testing |
 | `PROGRESS_REPORT.md` | Interim (CA 02) progress report |

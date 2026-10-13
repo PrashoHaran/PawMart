@@ -25,7 +25,7 @@ The frontend is a plain-JavaScript (no TypeScript) React app built with Vite. It
 ## Key Features
 
 - Marketplace with category filtering and debounced search; product pages with verified-purchase reviews and star ratings
-- Registration/login with a persisted session (JWT in `localStorage`, restored on reload); role-aware navbar (Vendor Portal and Admin links only for those roles)
+- Registration/login (email/password or Google's "Continue with Google" button) with a persisted session (JWT in `localStorage`, restored on reload); role-aware navbar (Vendor Portal and Admin links only for those roles)
 - Server-backed cart and checkout with a simulated card form (formatted inputs, per-field errors, test cards) or cash on delivery
 - User dashboard: overview with vaccine alerts, pets and health records (vaccination tracker), appointments with cancellation, order tracking with a progress indicator and cancellation
 - Appointment booking that shows each provider's open days and only free time slots
@@ -64,6 +64,8 @@ frontend/
 │   │   ├── QuantityStepper.jsx  # Reusable +/- quantity control
 │   │   ├── ReviewSection.jsx    # Product reviews list, star picker and review form
 │   │   ├── ImageUploadField.jsx # Cloudinary upload with preview (or URL fallback)
+│   │   ├── GoogleSignInButton.jsx # Google's official sign-in button
+│   │   ├── PayPalCheckout.jsx   # PayPal Smart Payment Buttons
 │   │   ├── ProductForm.jsx      # Add/edit product modal (vendor dashboard and admin catalogue)
 │   │   ├── dashboard/           # User dashboard tabs: pets, pet form, health panel, appointments, orders
 │   │   ├── orders/              # Order status helpers, progress indicator, vendor/admin order panel
@@ -76,7 +78,9 @@ frontend/
 │   │   ├── api.js               # Fetch wrapper: base URL, auth header, error envelope parsing, 401 handling
 │   │   ├── format.js            # Prices (cents), calendar dates and ages
 │   │   ├── image.js             # Broken-image fallback and Cloudinary resizing (optimizedImage)
-│   │   └── upload.js            # Signed direct uploads to Cloudinary
+│   │   ├── upload.js            # Signed direct uploads to Cloudinary
+│   │   ├── googleAuth.js        # Loads Google Identity Services, sign-in config
+│   │   └── paypal.js            # Loads the PayPal SDK, payment config
 │   └── pages/                   # One component per route (see Routes table below)
 ├── public/
 ├── .env.example
@@ -124,7 +128,7 @@ Declared in [`App.jsx`](src/App.jsx):
 | Path | Page Component | Notes |
 |---|---|---|
 | `/` | `Home.jsx` | Marketing landing page |
-| `/login` | `Login.jsx` | Combined sign-in/sign-up form |
+| `/login` | `Login.jsx` | Combined sign-in/sign-up form, plus Continue with Google when configured |
 | `/marketplace` | `Marketplace.jsx` | Product listing with category filter and debounced search |
 | `/product/:id` | `ProductDetail.jsx` | Product details, reviews and review form |
 | `/cart` | `Cart.jsx` | Cart, shipping details, simulated payment and checkout |

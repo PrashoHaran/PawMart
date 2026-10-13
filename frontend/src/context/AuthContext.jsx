@@ -53,9 +53,19 @@ export function AuthProvider({ children }) {
       startSession(data);
     };
 
+    // Exchanges a Google ID token for a PawMart session.
+    const loginWithGoogle = async (credential) => {
+      const { data } = await apiRequest('/auth/google', {
+        method: 'POST',
+        body: { credential },
+      });
+      startSession(data);
+      return data;
+    };
+
     const logout = () => clearSession();
 
-    return { user, token, restoring, register, login, logout };
+    return { user, token, restoring, register, login, loginWithGoogle, logout };
   }, [user, token, restoring, clearSession]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

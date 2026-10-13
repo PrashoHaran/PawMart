@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PawPrint, Mail, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { getAuthConfig } from '../lib/googleAuth';
+import GoogleSignInButton from '../components/GoogleSignInButton';
 
 export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
@@ -10,8 +12,28 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
-  const { login, register } = useAuth();
+  const { login, register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
+  const [googleClientId, setGoogleClientId] = useState(null);
+
+  useEffect(() => {
+    getAuthConfig()
+      .then((config) => setGoogleClientId(config.google.enabled ? config.google.clientId : null))
+      .catch(() => setGoogleClientId(null));
+  }, []);
+
+  const handleGoogleCredential = async (credential) => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      await loginWithGoogle(credential);
+      navigate('/');
+    } catch (err) {
+      setError(err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -150,39 +172,27 @@ export default function Login() {
             </button>
           </div>
           
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
+          {googleClientId && (
+            <div className="mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500 rounded-full">Or</span>
+                </div>
               </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500 rounded-full">Or continue with</span>
+
+              <div className="mt-6">
+                <GoogleSignInButton
+                  clientId={googleClientId}
+                  mode={isLogin ? 'signin' : 'signup'}
+                  onCredential={handleGoogleCredential}
+                  onError={setError}
+                />
               </div>
             </div>
-            
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                disabled
-                title="Coming soon"
-                aria-disabled="true"
-                className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-400 cursor-not-allowed"
-              >
-                <span className="sr-only">Sign in with Google (coming soon)</span>
-                Google
-              </button>
-              <button
-                type="button"
-                disabled
-                title="Coming soon"
-                aria-disabled="true"
-                className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-400 cursor-not-allowed"
-              >
-                <span className="sr-only">Sign in with Facebook (coming soon)</span>
-                Facebook
-              </button>
-            </div>
-          </div>
+          )}
         </form>
       </div>
     </div>

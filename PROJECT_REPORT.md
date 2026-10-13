@@ -170,6 +170,7 @@ Every response has the same envelope, so the frontend handles all endpoints the 
 | ODM | Mongoose | 8 | Schemas, validation, indexes, population |
 | Validation | Zod | 3 | Declarative request validation with clear error messages |
 | Auth | jsonwebtoken + bcryptjs | 9 / 2 | Stateless JWT sessions; salted password hashing |
+| Google sign-in | Google Identity Services + google-auth-library | 10.9.1 | Official "Sign in with Google" button; server-side ID-token verification |
 | Security | Helmet, cors, express-rate-limit | 7 / 2 / 7 | Security headers, origin restriction, abuse protection |
 | Email | Nodemailer | 10.0.12 | SMTP email from Node without a paid service |
 | Scheduling | node-cron | 4.6.0 | Daily background job inside the API process |
@@ -194,6 +195,7 @@ Each module below lists what it does, the key business rules, and where it lives
 - Each token carries a `tokenVersion`; increasing it on the server **invalidates every existing session** for that user (used when roles change or an account is suspended).
 - Role checks happen on the server for every protected endpoint; the UI also hides links (e.g. **Admin** and **Vendor Portal**) from users who can't use them.
 - Suspended users are rejected at login (`403`) and on every request (`401`).
+- **Sign in with Google:** Google's official button returns a signed ID token, which the server verifies with `google-auth-library` (signature, expiry, issuer, audience = PawMart's client ID; verified email required). Users are matched by their Google account ID; a new Google user becomes a customer without a password. An existing password account with the same email is linked only when Google is authoritative for the address (Gmail or a Google Workspace domain) — otherwise the user must sign in with their password, which prevents account takeover. The same roles, suspension rules and dashboards apply.
 
 ### 6.2 Marketplace and Products
 
@@ -456,7 +458,7 @@ The complete endpoint list, with who can call each one, is in [`backend/README.m
 | Page | Route | Purpose |
 |---|---|---|
 | Home | `/` | Landing page |
-| Login / Register | `/login` | Combined sign-in and sign-up |
+| Login / Register | `/login` | Combined sign-in and sign-up, with Continue with Google |
 | Marketplace | `/marketplace` | Product search and filters |
 | Product Detail | `/product/:id` | Details, reviews, add to cart |
 | Cart & Checkout | `/cart` | Cart, shipping, simulated payment |
@@ -524,6 +526,7 @@ The complete endpoint list, with who can call each one, is in [`backend/README.m
 | `CLOUDINARY_CLOUD_NAME` / `_API_KEY` / `_API_SECRET` | No | Image uploads |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` | No | Real email delivery |
 | `REMINDERS_ENABLED`, `REMINDER_CRON`, `REMINDER_TZ`, `REMINDER_DAYS_BEFORE` | No | Vaccination reminder schedule |
+| `GOOGLE_CLIENT_ID` | No | Sign in with Google |
 | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_ENV` | No | PayPal Checkout (sandbox by default) |
 
 The frontend has one optional variable, `VITE_API_URL` (default `http://localhost:5000/api`).
@@ -592,7 +595,7 @@ cd backend && npm run make-admin -- you@example.com
 | Deployment on Vercel + Render + Atlas | 🚧 | Database is on Atlas; hosting not yet set up |
 | Week 7–8 testing | 🟡 | Extensive scripted and browser testing; no committed automated suite |
 
-**Additions beyond the proposal:** PayPal Checkout (sandbox), order cancellation with refunds, product moderation and account suspension, analytics reports, live slot availability, Sri Lanka timezone handling, saved-pet shortcuts in the assistant.
+**Additions beyond the proposal:** Sign in with Google, PayPal Checkout (sandbox), order cancellation with refunds, product moderation and account suspension, analytics reports, live slot availability, Sri Lanka timezone handling, saved-pet shortcuts in the assistant.
 
 ---
 
@@ -606,7 +609,7 @@ cd backend && npm run make-admin -- you@example.com
 | Orders | Whole-order cancellation only; vendors can't cancel | Partial cancellations with partial refunds |
 | Reminders | Free hosting may sleep at the scheduled time | External scheduler calling the admin "run now" endpoint |
 | Images | Replaced images stay in Cloudinary | Delete old assets on replace |
-| Accounts | No password reset, social login or profile settings | Email-based reset; settings page |
+| Accounts | No password reset or profile settings; Facebook login not implemented | Email-based reset; settings page |
 | Assistant | 23 breeds; advice reviewed by the team, not a vet | Expand breeds; have a veterinarian review the rules |
 | Pages | Footer pages (FAQ, policies) and vendor "Customers" view are placeholders | Add content and customer insights |
 
@@ -643,6 +646,7 @@ Because free Render instances sleep when idle, the 08:00 reminder job may be mis
 **Technical documentation**
 
 - [React](https://react.dev/) · [Vite](https://vite.dev/) · [React Router](https://reactrouter.com/) · [Tailwind CSS](https://tailwindcss.com/)
+- [Sign in with Google (Google Identity Services)](https://developers.google.com/identity/gsi/web/guides/overview) · [Verify Google ID tokens](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token)
 - [Express](https://expressjs.com/) · [Mongoose](https://mongoosejs.com/) · [MongoDB Atlas](https://www.mongodb.com/atlas) · [Zod](https://zod.dev/)
 - [PayPal Orders v2 API](https://developer.paypal.com/docs/api/orders/v2/) · [PayPal Standard Checkout](https://developer.paypal.com/studio/checkout/standard/integrate)
 - [Nodemailer](https://nodemailer.com/) · [node-cron](https://github.com/node-cron/node-cron) · [Cloudinary authentication signatures](https://cloudinary.com/documentation/authentication_signatures)
@@ -681,4 +685,5 @@ Any future expiry (e.g. `12/30`) and any 3-digit CVC.
 | [`README.md`](README.md) | Project overview and quick start |
 | [`backend/README.md`](backend/README.md) | API reference, environment variables, data models |
 | [`frontend/README.md`](frontend/README.md) | Routes, components, styling system |
+| [`GOOGLE_SETUP.md`](GOOGLE_SETUP.md) / [`PAYPAL_SETUP.md`](PAYPAL_SETUP.md) | Setup guides for Google sign-in and PayPal |
 | [`PROGRESS_REPORT.md`](PROGRESS_REPORT.md) | Interim (CA 02) progress report |

@@ -31,6 +31,11 @@ export const env = {
     apiKey: process.env.CLOUDINARY_API_KEY,
     apiSecret: process.env.CLOUDINARY_API_SECRET,
   },
+  // Sign in with Google. Only the (public) OAuth client ID is needed: the
+  // browser gets an ID token from Google and the server verifies it.
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID,
+  },
   // PayPal Checkout. PAYPAL_ENV=sandbox uses test accounts (no real money).
   // When the client ID/secret are unset, PayPal is simply not offered.
   paypal: {

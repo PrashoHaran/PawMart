@@ -6,6 +6,10 @@ export const registerSchema = z.object({
   password: z.string().min(8).max(72),
 });
 
+export const googleLoginSchema = z.object({
+  credential: z.string().min(20).max(8192),
+});
+
 export const loginSchema = z.object({
   email: z.string().trim().email(),
   password: z.string().min(1),
