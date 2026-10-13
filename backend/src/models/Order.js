@@ -45,7 +45,7 @@ const orderSchema = new mongoose.Schema(
       city: String,
       postalCode: String,
     },
-    paymentMethod: { type: String, enum: ['credit_card', 'cash_on_delivery'], required: true },
+    paymentMethod: { type: String, enum: ['credit_card', 'cash_on_delivery', 'paypal'], required: true },
     paymentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Payment', default: null },
   },
   { timestamps: true }

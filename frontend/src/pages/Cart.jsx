@@ -1,8 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { paymentSummary, orderNumber } from '../components/orders/orderStatus';
 import { Trash2, CreditCard, Lock, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import { apiRequest } from '../lib/api';
+import { getPaymentConfig } from '../lib/paypal';
+import PayPalCheckout from '../components/PayPalCheckout';
 import { formatPriceCents } from '../lib/format';
 import { handleImageError, optimizedImage } from '../lib/image';
 import QuantityStepper from '../components/QuantityStepper';
@@ -31,13 +35,24 @@ function formatExpiry(value) {
 }
 
 export default function Cart() {
-  const { items, updateQuantity, removeItem, subtotalCents, checkout } = useCart();
+  const { items, updateQuantity, removeItem, subtotalCents, checkout, refreshCart } = useCart();
+  const { token } = useAuth();
   const [order, setOrder] = useState(null);
   const [address, setAddress] = useState(EMPTY_ADDRESS);
   const [paymentMethod, setPaymentMethod] = useState('credit_card');
   const [card, setCard] = useState(EMPTY_CARD);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const [paypalConfig, setPaypalConfig] = useState(null);
+  // PayPal order currently open in the popup (to release it on errors).
+  const openPayPalOrder = useRef(null);
+
+  useEffect(() => {
+    getPaymentConfig()
+      .then((config) => setPaypalConfig(config.paypal.enabled ? config.paypal : null))
+      .catch(() => setPaypalConfig(null));
+  }, []);
 
   const shippingCents = subtotalCents > FREE_SHIPPING_THRESHOLD_CENTS ? 0 : FLAT_SHIPPING_CENTS;
   const taxCents = Math.round(subtotalCents * TAX_RATE);
@@ -60,6 +75,58 @@ export default function Cart() {
     }
   };
 
+  const addressComplete = Object.values(address).every((value) => value.trim());
+
+  // ---- PayPal: create (reserve stock + PayPal order) -> approve in popup -> capture
+  const startPayPal = async () => {
+    setError(null);
+    setNotice(null);
+    if (!addressComplete) {
+      const err = new Error('Fill in your shipping information before paying with PayPal.');
+      setError(err);
+      throw err;
+    }
+    try {
+      const { data } = await apiRequest('/orders/paypal', { method: 'POST', token, body: { shippingAddress: address } });
+      openPayPalOrder.current = data.paypalOrderId;
+      return data.paypalOrderId;
+    } catch (err) {
+      setError(err);
+      throw err;
+    }
+  };
+
+  const capturePayPal = async (paypalOrderId) => {
+    try {
+      const { data } = await apiRequest(`/orders/paypal/${paypalOrderId}/capture`, { method: 'POST', token });
+      openPayPalOrder.current = null;
+      setOrder(data);
+      refreshCart();
+    } catch (err) {
+      setError(err);
+      // Declined funding source: let the buyer pick another one in PayPal.
+      if (err.details?.some((d) => d.code === 'INSTRUMENT_DECLINED')) throw { restart: true };
+      throw err;
+    }
+  };
+
+  const releasePayPal = async (paypalOrderId) => {
+    const id = paypalOrderId || openPayPalOrder.current;
+    openPayPalOrder.current = null;
+    if (!id) return;
+    await apiRequest(`/orders/paypal/${id}/cancel`, { method: 'POST', token }).catch(() => {});
+  };
+
+  const cancelPayPal = async (paypalOrderId) => {
+    await releasePayPal(paypalOrderId);
+    setNotice('PayPal payment cancelled — nothing was charged and your cart is unchanged.');
+  };
+
+  const payPalFailed = async (err) => {
+    await releasePayPal();
+    setError((current) => current ?? { message: err?.message || 'PayPal ran into a problem. Please try again.' });
+  };
+
   // Per-field messages for card problems returned by the API.
   const cardErrors = Object.fromEntries(
     (error?.details ?? [])
@@ -79,7 +146,11 @@ export default function Cart() {
           </p>
           <p className={`text-sm font-medium mb-1 ${payment.className}`}>{payment.text}</p>
           {order.payment?.transactionRef && (
-            <p className="text-xs text-gray-400 mb-6">Reference {order.payment.transactionRef} (simulated)</p>
+            <p className="text-xs text-gray-400 mb-6">
+              {order.paymentMethod === 'paypal'
+                ? `PayPal transaction ${order.payment.transactionRef}${paypalConfig?.environment === 'sandbox' ? ' (sandbox)' : ''}`
+                : `Reference ${order.payment.transactionRef} (simulated)`}
+            </p>
           )}
           <div className="flex flex-wrap justify-center gap-3 mt-6">
             <Link to="/dashboard?tab=orders" className="btn-outline">Track Order</Link>
@@ -102,9 +173,14 @@ export default function Cart() {
           <div className="alert alert-warning mb-8" role="alert">
             <p className="text-sm text-orange-700">
               {error.code === 'PAYMENT_DECLINED'
-                ? `Payment failed: ${error.message} Your cart is unchanged — check your card details or try another card.`
+                ? `Payment failed: ${error.message} Your cart is unchanged — ${paymentMethod === 'paypal' ? 'choose another payment method in PayPal.' : 'check your card details or try another card.'}`
                 : `Couldn't place order: ${error.message}`}
             </p>
+          </div>
+        )}
+        {notice && !error && (
+          <div className="alert alert-info mb-8" role="status">
+            <p className="text-sm text-gray-700">{notice}</p>
           </div>
         )}
 
@@ -179,9 +255,9 @@ export default function Cart() {
 
             {/* Payment Info */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 border-b border-gray-100 pb-4">Payment Method (Simulated)</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-b border-gray-100 pb-4">Payment Method</h2>
 
-              <div className="flex gap-4 mb-6">
+              <div className={`grid gap-4 mb-6 grid-cols-1 ${paypalConfig ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
                 <label className={`flex-1 border-2 rounded-xl p-4 flex items-center justify-between cursor-pointer transition-colors ${paymentMethod === 'credit_card' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'}`}>
                   <div className="flex items-center gap-2">
                     <input type="radio" name="payment" checked={paymentMethod === 'credit_card'} onChange={() => setPaymentMethod('credit_card')} className="text-primary focus:ring-primary h-4 w-4" />
@@ -195,7 +271,27 @@ export default function Cart() {
                     <span className={`font-semibold ${paymentMethod === 'cash_on_delivery' ? 'text-primary-dark' : 'text-gray-700'}`}>Cash on Delivery</span>
                   </div>
                 </label>
+                {paypalConfig && (
+                  <label className={`flex-1 border-2 rounded-xl p-4 flex items-center justify-between cursor-pointer transition-colors ${paymentMethod === 'paypal' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'}`}>
+                    <div className="flex items-center gap-2">
+                      <input type="radio" name="payment" checked={paymentMethod === 'paypal'} onChange={() => { setPaymentMethod('paypal'); setError(null); }} className="text-primary focus:ring-primary h-4 w-4" />
+                      <span className="font-bold italic"><span className="text-[#003087]">Pay</span><span className="text-[#009cde]">Pal</span></span>
+                    </div>
+                  </label>
+                )}
               </div>
+
+              {paymentMethod === 'paypal' && (
+                <div className="text-sm text-gray-600 bg-gray-50 border border-gray-100 rounded-lg p-4 space-y-1">
+                  <p>You&apos;ll approve the payment in a secure PayPal window, then return here to see your order.</p>
+                  {paypalConfig?.environment === 'sandbox' && (
+                    <p className="text-xs text-gray-500">
+                      <span className="font-semibold">Sandbox mode — no real money is taken.</span> Log in with a PayPal sandbox
+                      <em> personal</em> test account (Developer Dashboard → Sandbox accounts), or choose &ldquo;Debit or Credit Card&rdquo; and use a generated test card.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {paymentMethod === 'credit_card' && (
                 <div className="space-y-4">
@@ -299,16 +395,31 @@ export default function Cart() {
                 </div>
               </div>
 
-              <button
-                onClick={handlePlaceOrder}
-                disabled={items.length === 0 || placing}
-                className="w-full btn-primary py-4 text-lg flex justify-center items-center gap-2 mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {placing ? 'Placing Order...' : 'Place Order'} <ArrowRight className="h-5 w-5" aria-hidden="true" />
-              </button>
+              {paymentMethod === 'paypal' && paypalConfig ? (
+                items.length > 0 && (
+                  <div className="mb-4 relative z-0">
+                    <PayPalCheckout
+                      config={paypalConfig}
+                      onCreate={startPayPal}
+                      onApprove={capturePayPal}
+                      onCancel={cancelPayPal}
+                      onError={payPalFailed}
+                    />
+                  </div>
+                )
+              ) : (
+                <button
+                  onClick={handlePlaceOrder}
+                  disabled={items.length === 0 || placing}
+                  className="w-full btn-primary py-4 text-lg flex justify-center items-center gap-2 mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {placing ? 'Placing Order...' : 'Place Order'} <ArrowRight className="h-5 w-5" aria-hidden="true" />
+                </button>
+              )}
 
               <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
-                <Lock className="h-4 w-4" aria-hidden="true" /> Secure Checkout (Simulated)
+                <Lock className="h-4 w-4" aria-hidden="true" />{' '}
+                {paymentMethod === 'paypal' ? `Payment processed by PayPal${paypalConfig?.environment === 'sandbox' ? ' (sandbox)' : ''}` : 'Secure Checkout (Simulated)'}
               </div>
             </div>
           </div>

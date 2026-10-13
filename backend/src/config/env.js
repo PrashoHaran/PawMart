@@ -31,6 +31,18 @@ export const env = {
     apiKey: process.env.CLOUDINARY_API_KEY,
     apiSecret: process.env.CLOUDINARY_API_SECRET,
   },
+  // PayPal Checkout. PAYPAL_ENV=sandbox uses test accounts (no real money).
+  // When the client ID/secret are unset, PayPal is simply not offered.
+  paypal: {
+    clientId: process.env.PAYPAL_CLIENT_ID,
+    clientSecret: process.env.PAYPAL_CLIENT_SECRET,
+    environment: process.env.PAYPAL_ENV === 'live' ? 'live' : 'sandbox',
+    // Optional override (used to point tests at a local mock).
+    apiBase: process.env.PAYPAL_API_BASE,
+    currency: 'USD',
+    // Country of PawMart's shipping addresses (checkout has no country field).
+    shippingCountry: process.env.PAYPAL_SHIPPING_COUNTRY || 'LK',
+  },
   emailFrom: process.env.EMAIL_FROM || 'PawMart <no-reply@pawmart.local>',
   reminders: {
     enabled: process.env.REMINDERS_ENABLED !== 'false',

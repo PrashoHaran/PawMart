@@ -7,7 +7,7 @@ const paymentSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null },
-    method: { type: String, enum: ['credit_card', 'cash_on_delivery'], required: true },
+    method: { type: String, enum: ['credit_card', 'cash_on_delivery', 'paypal'], required: true },
     amountCents: { type: Number, required: true, min: 0 },
     status: {
       type: String,
@@ -20,7 +20,11 @@ const paymentSchema = new mongoose.Schema(
       expMonth: Number,
       expYear: Number,
     },
-    transactionRef: { type: String, default: null },
+    transactionRef: { type: String, default: null }, // simulated ref, or PayPal capture ID
+    // PayPal order ID while the buyer approves the payment in PayPal.
+    providerOrderId: { type: String, default: null },
+    payerEmail: { type: String, default: null },
+    refundRef: { type: String, default: null },
     failureCode: { type: String, default: null },
     failureMessage: { type: String, default: null },
     paidAt: { type: Date, default: null },
@@ -31,5 +35,6 @@ const paymentSchema = new mongoose.Schema(
 
 paymentSchema.index({ userId: 1, createdAt: -1 });
 paymentSchema.index({ orderId: 1 });
+paymentSchema.index({ providerOrderId: 1 }, { sparse: true });
 
 export const Payment = mongoose.model('Payment', paymentSchema);

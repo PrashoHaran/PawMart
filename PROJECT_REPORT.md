@@ -174,7 +174,7 @@ Every response has the same envelope, so the frontend handles all endpoints the 
 | Email | Nodemailer | 10.0.12 | SMTP email from Node without a paid service |
 | Scheduling | node-cron | 4.6.0 | Daily background job inside the API process |
 | Images | Cloudinary | REST API | Free image hosting, resizing and format conversion |
-| Payments | Simulated gateway (own code) | — | Realistic checkout without real money or third-party setup |
+| Payments | PayPal Checkout (sandbox) + simulated card gateway (own code) | Orders v2 REST API | Real PayPal flow with test money; simulated cards for offline demos |
 
 ### 5.2 Dependency choices worth noting
 
@@ -236,6 +236,32 @@ flowchart TD
 - **Test cards** reproduce real decline reasons: declined, insufficient funds, expired card, incorrect CVC.
 - Every attempt is stored in the **Payment** collection, but only the **card brand and last four digits** — never the full number or CVC.
 - Cancelling a card-paid order marks the payment **refunded**; cash-on-delivery payments are **collected** on delivery.
+
+**PayPal Checkout (sandbox).** Alongside the simulated card and cash on delivery, customers can pay through **PayPal's real checkout in sandbox mode** (test money only):
+
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant A as PawMart API
+    participant P as PayPal (sandbox)
+    B->>A: POST /orders/paypal {shippingAddress}
+    A->>A: Reserve stock · pending order (server-calculated total)
+    A->>P: Create order (Orders v2)
+    P-->>A: PayPal order ID
+    A-->>B: paypalOrderId
+    B->>P: Buyer approves in PayPal popup
+    B->>A: POST /orders/paypal/:id/capture
+    A->>P: Capture
+    P-->>A: COMPLETED + capture ID
+    A->>A: Check amount · confirm order · clear cart · email
+    A-->>B: Confirmed order
+```
+
+- The total is always calculated on the server, and the captured amount is checked against it before the order is confirmed.
+- If PayPal declines the buyer's funding source, the order stays open and PayPal lets the buyer choose another method; if the buyer closes the popup, the reserved stock is released.
+- A background job releases checkouts abandoned for 30 minutes — or confirms them if PayPal shows they were paid.
+- Cancelling a PayPal-paid order issues a real **sandbox refund** through PayPal.
+- Unpaid orders are hidden from vendors and excluded from revenue; the PayPal option only appears when credentials are configured.
 
 ### 6.6 Order Management
 
@@ -498,6 +524,7 @@ The complete endpoint list, with who can call each one, is in [`backend/README.m
 | `CLOUDINARY_CLOUD_NAME` / `_API_KEY` / `_API_SECRET` | No | Image uploads |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` | No | Real email delivery |
 | `REMINDERS_ENABLED`, `REMINDER_CRON`, `REMINDER_TZ`, `REMINDER_DAYS_BEFORE` | No | Vaccination reminder schedule |
+| `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_ENV` | No | PayPal Checkout (sandbox by default) |
 
 The frontend has one optional variable, `VITE_API_URL` (default `http://localhost:5000/api`).
 
@@ -542,7 +569,7 @@ cd backend && npm run make-admin -- you@example.com
 |---|---|---|
 | **V. Prashoharan** | Authentication, authorisation, admin dashboard | JWT auth, roles, account suspension, Admin Hub (alerts, users, verification, products, orders, appointments, reports), vendor application page |
 | **Bashini Rashmika Vindyani** | Product management, vendor dashboard | Product catalogue and search, vendor products with image uploads, vendor orders and statistics |
-| **J.P. Inuka Sithanja Jayasinghe** | Shopping cart, checkout, simulated payment | Server cart, atomic checkout, simulated card gateway with declines, Payment records, refunds |
+| **J.P. Inuka Sithanja Jayasinghe** | Shopping cart, checkout, simulated payment | Server cart, atomic checkout, PayPal Checkout (sandbox), simulated card gateway with declines, Payment records, refunds |
 | **D.S.N. Vitharana** | Order management, appointment booking | Per-item fulfilment and tracking, cancellations, Provider Portal, live availability, booking emails |
 | **B.R.G.S. Sandaruwan** | Reviews, Smart Assistant, pet health records and reminders | Verified reviews, breed-specific Smart Assistant, pet profiles and health records, vaccination reminders |
 
@@ -565,7 +592,7 @@ cd backend && npm run make-admin -- you@example.com
 | Deployment on Vercel + Render + Atlas | 🚧 | Database is on Atlas; hosting not yet set up |
 | Week 7–8 testing | 🟡 | Extensive scripted and browser testing; no committed automated suite |
 
-**Additions beyond the proposal:** order cancellation with refunds, product moderation and account suspension, analytics reports, live slot availability, Sri Lanka timezone handling, saved-pet shortcuts in the assistant.
+**Additions beyond the proposal:** PayPal Checkout (sandbox), order cancellation with refunds, product moderation and account suspension, analytics reports, live slot availability, Sri Lanka timezone handling, saved-pet shortcuts in the assistant.
 
 ---
 
@@ -575,7 +602,7 @@ cd backend && npm run make-admin -- you@example.com
 |---|---|---|
 | Testing | No committed automated tests or CI | Jest + Supertest API tests on an in-memory MongoDB; GitHub Actions |
 | Deployment | Not yet hosted | Render (API) + Vercel (frontend); see Section 17 |
-| Payments | Simulated only | Integrate a real gateway (e.g. PayHere for Sri Lanka) |
+| Payments | PayPal runs in sandbox; cards are simulated | Switch PayPal to live credentials; add PayHere for LKR payments once the API has a public URL |
 | Orders | Whole-order cancellation only; vendors can't cancel | Partial cancellations with partial refunds |
 | Reminders | Free hosting may sleep at the scheduled time | External scheduler calling the admin "run now" endpoint |
 | Images | Replaced images stay in Cloudinary | Delete old assets on replace |
@@ -593,6 +620,7 @@ cd backend && npm run make-admin -- you@example.com
 | Backend API | Render web service | `npm run start`; all environment variables set on Render; `FRONTEND_URL` = the Vercel URL; `NODE_ENV=production` |
 | Frontend | Vercel | `npm run build`; `VITE_API_URL` = the Render API URL; SPA rewrites so client routes load |
 | Email | Any SMTP provider (e.g. Gmail app password) | `SMTP_*`, `EMAIL_FROM` |
+| Payments | PayPal sandbox app | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_ENV` |
 | Images | Cloudinary | `CLOUDINARY_*` |
 
 Because free Render instances sleep when idle, the 08:00 reminder job may be missed; the admin "Send vaccine reminders now" button or an external scheduler covers this.
@@ -616,6 +644,7 @@ Because free Render instances sleep when idle, the 08:00 reminder job may be mis
 
 - [React](https://react.dev/) · [Vite](https://vite.dev/) · [React Router](https://reactrouter.com/) · [Tailwind CSS](https://tailwindcss.com/)
 - [Express](https://expressjs.com/) · [Mongoose](https://mongoosejs.com/) · [MongoDB Atlas](https://www.mongodb.com/atlas) · [Zod](https://zod.dev/)
+- [PayPal Orders v2 API](https://developer.paypal.com/docs/api/orders/v2/) · [PayPal Standard Checkout](https://developer.paypal.com/studio/checkout/standard/integrate)
 - [Nodemailer](https://nodemailer.com/) · [node-cron](https://github.com/node-cron/node-cron) · [Cloudinary authentication signatures](https://cloudinary.com/documentation/authentication_signatures)
 - [Helmet](https://helmetjs.github.io/) · [express-rate-limit](https://github.com/express-rate-limit/express-rate-limit) · [jsonwebtoken](https://github.com/auth0/node-jsonwebtoken)
 

@@ -71,8 +71,9 @@ export function CartProvider({ children }) {
       updateQuantity,
       removeItem,
       checkout,
+      refreshCart,
     };
-  }, [cart, token]);
+  }, [cart, token, refreshCart]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

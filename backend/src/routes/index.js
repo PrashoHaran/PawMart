@@ -13,6 +13,7 @@ import reviewRoutes from './review.routes.js';
 import petRoutes from './pet.routes.js';
 import uploadRoutes from './upload.routes.js';
 import providerRoutes from './provider.routes.js';
+import paymentRoutes from './payment.routes.js';
 
 const router = Router();
 
@@ -30,5 +31,6 @@ router.use('/reviews', reviewRoutes);
 router.use('/pets', petRoutes);
 router.use('/uploads', uploadRoutes);
 router.use('/provider', providerRoutes);
+router.use('/payments', paymentRoutes);
 
 export default router;

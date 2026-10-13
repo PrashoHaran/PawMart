@@ -13,7 +13,7 @@ const ORDER_STATUS_LABELS = { confirmed: 'Confirmed', processing: 'Processing', 
 const APPOINTMENT_STATUS_LABELS = { booked: 'Booked', completed: 'Completed', no_show: 'No-show', cancelled: 'Cancelled' };
 const TYPE_LABELS = { vet: 'Veterinary', grooming: 'Grooming', unknown: 'Other' };
 const ROLE_LABELS = { customer: 'Customers', vendor: 'Vendors', admin: 'Admins' };
-const PAYMENT_LABELS = { credit_card: 'Card', cash_on_delivery: 'Cash on delivery' };
+const PAYMENT_LABELS = { credit_card: 'Card', cash_on_delivery: 'Cash on delivery', paypal: 'PayPal' };
 
 // Compact money for axis ticks and tiles: $950, $1.2K, $12K, $1.4M.
 function compactMoney(cents) {

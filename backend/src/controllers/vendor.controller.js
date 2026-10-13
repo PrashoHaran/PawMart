@@ -46,7 +46,7 @@ export const getMyVendorStats = asyncHandler(async (req, res) => {
   const activeProductCount = productIds.length;
 
   const [salesSummary] = await Order.aggregate([
-    { $match: { 'items.product': { $in: productIds }, status: { $ne: 'cancelled' } } },
+    { $match: { 'items.product': { $in: productIds }, status: { $nin: ['cancelled', 'pending'] } } },
     { $unwind: '$items' },
     { $match: { 'items.product': { $in: productIds }, 'items.status': { $ne: 'cancelled' } } },
     {
@@ -84,7 +84,7 @@ function isVendorItem(vendorId, productIds) {
 export const listMyOrders = asyncHandler(async (req, res) => {
   const { status, page, limit } = req.query;
   const { productIds, filter } = await vendorOrderFilter(req.user._id);
-  const query = status ? { ...filter, status } : filter;
+  const query = { ...filter, status: status ?? { $ne: 'pending' } };
 
   const [orders, total] = await Promise.all([
     Order.find(query)

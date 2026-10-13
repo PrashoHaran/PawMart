@@ -39,6 +39,7 @@ PawMart is feature-complete against the original proposal and running end-to-end
 | Reviews and ratings (verified purchasers) | ✅ Implemented |
 | Cart and checkout | ✅ Implemented with backend/database |
 | Simulated card payment (with declines and refunds) | ✅ Implemented |
+| PayPal Checkout (sandbox) | ✅ Implemented |
 | Order management and tracking | ✅ Implemented |
 | Vendor application workflow | ✅ Implemented |
 | Vendor product management | ✅ Implemented |
@@ -62,6 +63,7 @@ PawMart/
 ├── backend/               # Node.js + Express + MongoDB Atlas REST API
 ├── projectDetails/        # Project-related documentation/materials
 ├── Group_17.md            # Group/project information
+├── PAYPAL_SETUP.md        # PayPal sandbox setup guide
 ├── PROJECT_REPORT.md      # Full project report
 ├── PROGRESS_REPORT.md     # Interim (CA 02) progress report
 ├── README.md              # Project overview and setup
@@ -83,7 +85,7 @@ PawMart/
 | Image hosting | Cloudinary (signed direct uploads) |
 | Email | Nodemailer (SMTP) |
 | Background jobs | node-cron (daily vaccination reminders) |
-| Payments | Simulated card gateway (no real charges) |
+| Payments | PayPal Checkout (sandbox) and a simulated card gateway — no real charges |
 | API | REST API |
 
 ---
@@ -96,7 +98,7 @@ PawMart/
 - Browse, search and filter products; view product details
 - Read reviews, and leave a star rating and review after buying a product
 - Server-persisted cart and checkout with shipping details
-- Pay by simulated card (with test cards for declines) or cash on delivery
+- Pay with **PayPal** (sandbox), a simulated card (with test cards for declines) or cash on delivery
 - Track orders (confirmed → processing → shipped → delivered) and cancel before shipping, with refunds for card payments
 - Pet profiles (species, breed, birth date, weight, allergies, photo)
 - Health records: vaccination history with due/overdue tracking, medical conditions and notes
@@ -199,6 +201,7 @@ Everything else is optional and has a safe fallback:
 | Setting | Without it |
 |---|---|
 | `SMTP_*`, `EMAIL_FROM` | Emails are printed to the backend console instead of sent |
+| `PAYPAL_*` | PayPal isn't offered at checkout (card and cash still work) |
 | `CLOUDINARY_*` | Image fields fall back to pasting an image URL |
 | `REMINDER_*` | Vaccination reminders run daily at 08:00 Sri Lanka time |
 | `APP_UTC_OFFSET` | Appointment times use Sri Lanka time (`+05:30`) |
@@ -240,9 +243,18 @@ The frontend normally runs on `http://localhost:5173`. Open the displayed Vite U
 
 > If port 5173 is already in use, Vite may automatically start on another port such as 5174. Make sure the backend's `FRONTEND_URL` matches the port being used, or CORS will block requests.
 
+### Trying PayPal (sandbox)
+
+> 📘 Full step-by-step setup and troubleshooting guide: **[PAYPAL_SETUP.md](PAYPAL_SETUP.md)**. Quick version:
+
+1. Sign in at [developer.paypal.com](https://developer.paypal.com) (any PayPal account works). Under **Testing Tools → Sandbox Accounts**, make sure there is a **Business** account with country **United States** (create one if needed — sandbox sellers registered in Sri Lanka can't receive payments). Then **Apps & Credentials** → **Sandbox** → **Create App**, linked to that US business account.
+2. Copy the app's **Client ID** and **Secret** into `backend/.env` as `PAYPAL_CLIENT_ID` and `PAYPAL_CLIENT_SECRET` (keep `PAYPAL_ENV=sandbox`) and restart the backend.
+3. Under **Testing Tools → Sandbox Accounts**, open the **Personal** account (email ending `@personal.example.com`) to see its email and password — log in to the PayPal popup with this buyer account, not the business one.
+4. At checkout choose **PayPal**, click the PayPal button and log in with that sandbox buyer account — or choose **Debit or Credit Card** and use a card from PayPal's [card generator](https://developer.paypal.com/tools/sandbox/card-testing/). No real money is moved; the payment shows up in the sandbox business account.
+
 ### Trying the simulated payment
 
-Checkout accepts these test cards (any future expiry, any 3-digit CVC):
+Checkout also accepts these simulated test cards (any future expiry, any 3-digit CVC):
 
 | Card number | Result |
 |---|---|
@@ -263,7 +275,7 @@ PawMart uses MongoDB Atlas. The application uses these collections:
 | Reviews | One review per customer per purchased product |
 | Carts | One server-side cart per user |
 | Orders | Orders with per-item fulfilment status and history |
-| Payments | Every payment attempt (card brand/last 4 only — never full card numbers) |
+| Payments | Every payment attempt — PayPal, simulated card (brand/last 4 only, never full numbers) or cash |
 | VendorApplications | Vendor and service-provider applications |
 | Services | Bookable vet/grooming services and their schedules |
 | Appointments | Bookings, linked to services and optionally a pet |
@@ -335,6 +347,7 @@ Deployment notes (CORS origin, Atlas network access, SMTP, and the reminder job 
 |---|---|
 | `frontend/README.md` | Frontend setup, routes, state management, styling and scripts |
 | `backend/README.md` | Backend setup, environment variables, API reference and data models |
+| `PAYPAL_SETUP.md` | Step-by-step PayPal sandbox setup and troubleshooting |
 | `PROJECT_REPORT.md` | Full project report: architecture, tech stack, modules, data model, security, testing |
 | `PROGRESS_REPORT.md` | Interim (CA 02) progress report |
 | `projectDetails/` | Project-related documentation and supporting materials |

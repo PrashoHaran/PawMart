@@ -1,7 +1,7 @@
 export const FULFILMENT_FLOW = ['confirmed', 'processing', 'shipped', 'delivered'];
 
 export const ORDER_STATUS = {
-  pending: { label: 'Pending', className: 'badge-warning' },
+  pending: { label: 'Awaiting payment', className: 'badge-warning' },
   confirmed: { label: 'Confirmed', className: 'badge-info' },
   processing: { label: 'Processing', className: 'badge-warning' },
   shipped: { label: 'Shipped', className: 'badge-info' },
@@ -19,6 +19,12 @@ const BRAND_LABELS = { visa: 'Visa', mastercard: 'Mastercard', amex: 'Amex', car
 // One-line description of how an order was (or will be) paid.
 export function paymentSummary(order) {
   const payment = order.payment;
+  if (order.paymentMethod === 'paypal') {
+    if (!payment || payment.status === 'pending') return { text: 'PayPal • Awaiting payment', className: 'text-amber-600' };
+    if (payment.status === 'refunded') return { text: 'PayPal • Refunded', className: 'text-blue-600' };
+    if (payment.status === 'cancelled' || payment.status === 'failed') return { text: 'PayPal • Not completed', className: 'text-gray-500' };
+    return { text: `PayPal${payment.payerEmail ? ` (${payment.payerEmail})` : ''} • Paid`, className: 'text-green-600' };
+  }
   if (order.paymentMethod === 'cash_on_delivery') {
     if (!payment) return { text: 'Cash on delivery', className: 'text-gray-500' };
     if (payment.status === 'succeeded') return { text: 'Cash on delivery • Collected', className: 'text-green-600' };

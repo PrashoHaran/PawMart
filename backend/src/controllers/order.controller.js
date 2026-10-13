@@ -6,6 +6,7 @@ import { sendMail } from '../services/mailer.js';
 import { orderConfirmationEmail } from '../services/emailTemplates.js';
 import { cardSummary, charge, validateCard } from '../services/paymentGateway.js';
 import { cancelOrder as cancelOrderService, withPayments } from '../services/orderFulfilment.js';
+import { capturePayPalOrder, createPayPalOrder, isPayPalConfigured, paypalPublicConfig } from '../services/paypal.js';
 import { ApiError } from '../utils/ApiError.js';
 import { sendData } from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -23,21 +24,11 @@ function restock(decremented) {
   );
 }
 
-export const createOrder = asyncHandler(async (req, res) => {
-  const { paymentMethod, card, shippingAddress } = req.body;
-
-  // Reject malformed card details before touching stock.
-  if (paymentMethod === 'credit_card') {
-    const problems = validateCard(card);
-    if (problems.length) {
-      throw ApiError.badRequest('Invalid card details', problems);
-    }
-  }
-
-  const cart = await Cart.findOne({ userId: req.user._id }).populate(
-    'items.product',
-    'name priceCents stock vendorId'
-  );
+// Checks the cart, reserves stock atomically and prices the order. Throws
+// (with nothing reserved) if the cart is empty, an item is unavailable or
+// stock runs out. Callers must release `reserved` if they fail later.
+async function reserveCart(userId) {
+  const cart = await Cart.findOne({ userId }).populate('items.product', 'name priceCents stock vendorId');
 
   if (!cart || cart.items.length === 0) {
     throw ApiError.badRequest('Cart is empty');
@@ -56,7 +47,7 @@ export const createOrder = asyncHandler(async (req, res) => {
 
   // Atomically decrement stock per item; roll back any already-decremented
   // items in this request if a later item is out of stock.
-  const decremented = [];
+  const reserved = [];
   for (const item of cart.items) {
     const updated = await Product.findOneAndUpdate(
       { _id: item.product._id, stock: { $gte: item.quantity } },
@@ -64,16 +55,16 @@ export const createOrder = asyncHandler(async (req, res) => {
     );
 
     if (!updated) {
-      await restock(decremented);
+      await restock(reserved);
       throw ApiError.conflict(`Insufficient stock for "${item.product.name}"`, [
         { field: 'items', productId: item.product._id.toString() },
       ]);
     }
 
-    decremented.push({ productId: item.product._id, quantity: item.quantity });
+    reserved.push({ productId: item.product._id, quantity: item.quantity });
   }
 
-  const orderItems = cart.items.map((item) => ({
+  const items = cart.items.map((item) => ({
     product: item.product._id,
     vendorId: item.product.vendorId || null,
     name: item.product.name,
@@ -81,10 +72,30 @@ export const createOrder = asyncHandler(async (req, res) => {
     quantity: item.quantity,
   }));
 
-  const subtotalCents = orderItems.reduce((sum, i) => sum + i.priceCents * i.quantity, 0);
+  const subtotalCents = items.reduce((sum, i) => sum + i.priceCents * i.quantity, 0);
   const shippingCents = subtotalCents > FREE_SHIPPING_THRESHOLD_CENTS ? 0 : FLAT_SHIPPING_CENTS;
   const taxCents = Math.round(subtotalCents * TAX_RATE);
   const totalCents = subtotalCents + shippingCents + taxCents;
+
+  return { cart, items, reserved, subtotalCents, shippingCents, taxCents, totalCents };
+}
+
+export const createOrder = asyncHandler(async (req, res) => {
+  const { paymentMethod, card, shippingAddress } = req.body;
+
+  if (paymentMethod === 'paypal') {
+    throw ApiError.badRequest('PayPal payments start from POST /api/orders/paypal');
+  }
+
+  // Reject malformed card details before touching stock.
+  if (paymentMethod === 'credit_card') {
+    const problems = validateCard(card);
+    if (problems.length) {
+      throw ApiError.badRequest('Invalid card details', problems);
+    }
+  }
+
+  const { cart, items, reserved, subtotalCents, shippingCents, taxCents, totalCents } = await reserveCart(req.user._id);
 
   // Simulated card charge. On decline: restock, keep the cart, record the
   // failed attempt, and let the customer retry with corrected details.
@@ -92,7 +103,7 @@ export const createOrder = asyncHandler(async (req, res) => {
   if (paymentMethod === 'credit_card') {
     const result = charge(card);
     if (!result.ok) {
-      await restock(decremented);
+      await restock(reserved);
       await Payment.create({
         userId: req.user._id,
         method: 'credit_card',
@@ -117,7 +128,7 @@ export const createOrder = asyncHandler(async (req, res) => {
 
   const order = await Order.create({
     userId: req.user._id,
-    items: orderItems,
+    items,
     subtotalCents,
     taxCents,
     shippingCents,
@@ -147,6 +158,131 @@ export const createOrder = asyncHandler(async (req, res) => {
   sendMail({ to: req.user.email, ...orderConfirmationEmail(req.user, order) });
 });
 
+// ---------- PayPal Checkout
+//
+// 1. POST /orders/paypal          reserve stock, create a pending order and a PayPal order
+// 2. (buyer approves in the PayPal popup)
+// 3. POST /orders/paypal/:id/capture   capture the money, confirm the order, clear the cart
+//    POST /orders/paypal/:id/cancel    buyer closed the popup: release stock
+// Pending orders nobody completes are released by the cleanup job.
+
+export const startPayPalCheckout = asyncHandler(async (req, res) => {
+  if (!isPayPalConfigured()) {
+    throw new ApiError(503, 'PAYPAL_DISABLED', 'PayPal is not configured on this server');
+  }
+
+  const { items, reserved, subtotalCents, shippingCents, taxCents, totalCents } = await reserveCart(req.user._id);
+
+  const order = await Order.create({
+    userId: req.user._id,
+    items,
+    subtotalCents,
+    taxCents,
+    shippingCents,
+    totalCents,
+    status: 'pending',
+    statusHistory: [{ status: 'pending', byRole: 'customer' }],
+    shippingAddress: req.body.shippingAddress,
+    paymentMethod: 'paypal',
+  });
+
+  let paypalOrderId;
+  try {
+    paypalOrderId = await createPayPalOrder({
+      referenceId: order._id.toString(),
+      amountCents: totalCents,
+      description: `PawMart order #${order._id.toString().slice(-6).toUpperCase()}`,
+      shippingAddress: req.body.shippingAddress,
+    });
+  } catch (err) {
+    await restock(reserved);
+    await order.deleteOne();
+    throw err;
+  }
+
+  const payment = await Payment.create({
+    userId: req.user._id,
+    orderId: order._id,
+    method: 'paypal',
+    amountCents: totalCents,
+    status: 'pending',
+    providerOrderId: paypalOrderId,
+  });
+  order.paymentId = payment._id;
+  await order.save();
+
+  sendData(res, 201, { orderId: order._id, paypalOrderId, totalCents });
+});
+
+async function findPendingPayPal(req) {
+  const payment = await Payment.findOne({ providerOrderId: req.params.paypalOrderId, userId: req.user._id, method: 'paypal' });
+  if (!payment) {
+    throw ApiError.notFound('Payment not found');
+  }
+  const order = await Order.findById(payment.orderId);
+  if (!order) {
+    throw ApiError.notFound('Order not found');
+  }
+  return { payment, order };
+}
+
+// Marks a pending PayPal order as paid. Shared by capture and the cleanup job.
+export async function confirmPayPalOrder(order, payment, result) {
+  payment.status = 'succeeded';
+  payment.transactionRef = result.captureId;
+  payment.payerEmail = result.payerEmail;
+  payment.paidAt = new Date();
+  await payment.save();
+
+  order.status = 'confirmed';
+  order.statusHistory.push({ status: 'confirmed', byRole: 'system' });
+  await order.save();
+
+  await Cart.updateOne({ userId: order.userId }, { $set: { items: [] } });
+}
+
+export const capturePayPalCheckout = asyncHandler(async (req, res) => {
+  const { payment, order } = await findPendingPayPal(req);
+
+  if (payment.status === 'succeeded') {
+    // Already captured (e.g. a retried request) — just return the order.
+    const [data] = await withPayments([order.toObject()]);
+    return sendData(res, 200, data);
+  }
+  if (payment.status !== 'pending' || order.status !== 'pending') {
+    throw ApiError.conflict('This PayPal payment is no longer open. Please check out again.');
+  }
+
+  const result = await capturePayPalOrder(payment.providerOrderId, payment._id.toString());
+  if (result.declined) {
+    // Order stays pending so the buyer can choose another funding source.
+    throw new ApiError(402, 'PAYMENT_DECLINED', result.message, [{ field: 'paypal', code: 'INSTRUMENT_DECLINED' }]);
+  }
+  if (result.status !== 'COMPLETED' || result.captureStatus !== 'COMPLETED') {
+    throw new ApiError(402, 'PAYMENT_NOT_COMPLETED', 'PayPal has not completed this payment yet. Please try again.');
+  }
+  if (result.amountCents !== payment.amountCents || result.currency !== 'USD') {
+    // Should never happen — the amount is set by our server — but never
+    // confirm an order for a different amount than was charged.
+    throw new ApiError(409, 'PAYMENT_MISMATCH', 'The PayPal amount does not match the order total');
+  }
+
+  await confirmPayPalOrder(order, payment, result);
+
+  const [data] = await withPayments([order.toObject()]);
+  sendData(res, 200, data);
+  sendMail({ to: req.user.email, ...orderConfirmationEmail(req.user, order) });
+});
+
+export const cancelPayPalCheckout = asyncHandler(async (req, res) => {
+  const { payment, order } = await findPendingPayPal(req);
+  if (order.status === 'pending') {
+    await cancelOrderService(order, { byRole: 'customer' });
+  }
+  const latest = await Payment.findById(payment._id, 'status').lean();
+  sendData(res, 200, { orderId: order._id, status: order.status, paymentStatus: latest.status });
+});
+
 export const listOrders = asyncHandler(async (req, res) => {
   const orders = await Order.find({ userId: req.user._id }).sort({ createdAt: -1 }).lean();
   sendData(res, 200, await withPayments(orders));
@@ -170,3 +306,7 @@ export const cancelOrder = asyncHandler(async (req, res) => {
   const [data] = await withPayments([order.toObject()]);
   sendData(res, 200, data);
 });
+
+export const getPaymentConfig = (req, res) => {
+  sendData(res, 200, { paypal: paypalPublicConfig() });
+};

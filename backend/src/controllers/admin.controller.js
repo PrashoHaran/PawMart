@@ -6,6 +6,7 @@ import { Product } from '../models/Product.js';
 import { Service } from '../models/Service.js';
 import { env } from '../config/env.js';
 import { isCloudinaryConfigured } from '../utils/cloudinary.js';
+import { isPayPalConfigured } from '../services/paypal.js';
 import { advanceItems, cancelOrder, withPayments } from '../services/orderFulfilment.js';
 import { ApiError } from '../utils/ApiError.js';
 import { runVaccinationReminders } from '../jobs/vaccinationReminders.js';
@@ -37,7 +38,7 @@ export const getAdminStats = asyncHandler(async (req, res) => {
     Appointment.countDocuments({ status: 'booked' }),
     VendorApplication.countDocuments({ status: 'pending' }),
     Order.aggregate([
-      { $match: { status: { $ne: 'cancelled' } } },
+      { $match: { status: { $nin: ['cancelled', 'pending'] } } },
       { $group: { _id: null, count: { $sum: 1 }, revenueCents: { $sum: '$totalCents' } } },
     ]),
     Product.find({ hidden: { $ne: true }, stock: { $gt: 0, $lte: LOW_STOCK_THRESHOLD } }, 'name stock vendorName')
@@ -68,6 +69,9 @@ export const getAdminStats = asyncHandler(async (req, res) => {
   if (!env.smtp.host) {
     alerts.push({ level: 'info', title: 'Emails are not being sent', message: 'SMTP is not configured, so emails are only written to the server log.' });
   }
+  if (!isPayPalConfigured()) {
+    alerts.push({ level: 'info', title: 'PayPal checkout is off', message: 'Add PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET (sandbox) to offer PayPal at checkout.' });
+  }
   if (!isCloudinaryConfigured()) {
     alerts.push({ level: 'info', title: 'Image uploads are off', message: 'Cloudinary is not configured; forms fall back to image URLs.' });
   }
@@ -94,7 +98,7 @@ export const getReports = asyncHandler(async (req, res) => {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   const tz = env.appUtcOffset;
   const bucket = days > 90 ? '%Y-%m' : '%Y-%m-%d';
-  const activeOrders = { createdAt: { $gte: since }, status: { $ne: 'cancelled' } };
+  const activeOrders = { createdAt: { $gte: since }, status: { $nin: ['cancelled', 'pending'] } };
 
   const [revenue, ordersByStatus, topProducts, paymentMethods, appointmentsByStatus, appointmentsByType, signups] =
     await Promise.all([

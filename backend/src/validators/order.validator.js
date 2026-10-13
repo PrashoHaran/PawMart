@@ -1,14 +1,18 @@
 import { z } from 'zod';
 
+const shippingAddressSchema = z.object({
+  firstName: z.string().trim().min(1).max(100),
+  lastName: z.string().trim().min(1).max(100),
+  address: z.string().trim().min(1).max(255),
+  city: z.string().trim().min(1).max(100),
+  postalCode: z.string().trim().min(1).max(20),
+});
+
+export const startPayPalSchema = z.object({ shippingAddress: shippingAddressSchema });
+
 export const createOrderSchema = z
   .object({
-    shippingAddress: z.object({
-      firstName: z.string().trim().min(1).max(100),
-      lastName: z.string().trim().min(1).max(100),
-      address: z.string().trim().min(1).max(255),
-      city: z.string().trim().min(1).max(100),
-      postalCode: z.string().trim().min(1).max(20),
-    }),
+    shippingAddress: shippingAddressSchema,
     paymentMethod: z.enum(['credit_card', 'cash_on_delivery']),
     card: z
       .object({
@@ -30,7 +34,7 @@ const statusSchema = z.enum(['processing', 'shipped', 'delivered', 'cancelled'])
 export const updateOrderStatusSchema = z.object({ status: statusSchema });
 
 export const listOrdersQuerySchema = z.object({
-  status: z.enum(['confirmed', 'processing', 'shipped', 'delivered', 'cancelled']).optional(),
+  status: z.enum(['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });

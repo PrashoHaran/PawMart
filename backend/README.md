@@ -89,10 +89,12 @@ backend/
 │   │   ├── mailer.js           # Nodemailer transport (SMTP, or console logging when unconfigured)
 │   │   ├── emailTemplates.js   # HTML + text emails (orders, appointments, vaccination reminders)
 │   │   ├── paymentGateway.js   # Simulated card processor (Luhn/expiry/CVC checks, test decline cards)
+│   │   ├── paypal.js           # PayPal REST client (OAuth, create/capture orders, refunds)
 │   │   ├── orderFulfilment.js  # Order status rules, cancellation, restock and refunds
 │   │   └── appointmentStatus.js # Shared provider/admin booking outcome rules
 │   ├── jobs/
-│   │   └── vaccinationReminders.js # Daily node-cron job (also callable on demand by admins)
+│   │   ├── vaccinationReminders.js # Daily node-cron job (also callable on demand by admins)
+│   │   └── paypalCleanup.js    # Releases abandoned PayPal checkouts every 10 minutes
 │   ├── data/
 │   │   └── breedProfiles.js    # Smart Assistant breed knowledge, with sources
 │   ├── utils/
@@ -149,6 +151,9 @@ Defined in [`.env.example`](.env.example). Copy it to `.env` (gitignored) and fi
 | `JWT_SECRET` | **Yes** | — | Secret used to sign/verify JWTs — use a long random string |
 | `FRONTEND_URL` | No | `http://localhost:5173` | Origin allowed by CORS (the Vite dev server by default); also used for links in emails |
 | `APP_UTC_OFFSET` | No | `+05:30` | Timezone offset appointment time slots are interpreted in, independent of the server's own timezone |
+| `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` | No | — | Enables PayPal Checkout. If unset, PayPal isn't offered |
+| `PAYPAL_ENV` | No | `sandbox` | `sandbox` (test money) or `live` |
+| `PAYPAL_SHIPPING_COUNTRY` | No | `LK` | Country code sent to PayPal with the checkout shipping address |
 | `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | No | — | Enables image uploads (product images, pet photos). If unset, forms fall back to an image-URL field |
 | `SMTP_HOST` | No | — | SMTP server. **If unset, emails are printed to the console instead of sent** |
 | `SMTP_PORT` | No | `587` | SMTP port |
@@ -169,6 +174,23 @@ Uploads go **directly from the browser to Cloudinary** using signed uploads, so 
 3. The browser uploads the file to Cloudinary and saves the returned `secure_url` on the product or pet.
 
 `GET /api/uploads/config` tells the frontend whether uploads are enabled. Cloudinary images are displayed with delivery transformations (`c_limit,w_<n>,f_auto,q_auto`) so each view loads a resized, compressed version. The 5 MB size limit is checked in the browser; to enforce it on Cloudinary's side as well, create a signed upload preset with a max file size.
+
+### PayPal Checkout (sandbox)
+
+PayPal is offered next to the simulated card and cash on delivery when `PAYPAL_CLIENT_ID` and `PAYPAL_CLIENT_SECRET` are set. With `PAYPAL_ENV=sandbox` it uses PayPal's test environment: real PayPal pages, **no real money**.
+
+1. `POST /api/orders/paypal` `{ shippingAddress }` reserves stock, creates a `pending` order and a PayPal order for the **server-calculated** total, and returns `paypalOrderId`.
+2. The browser shows PayPal's buttons; the buyer approves in the PayPal popup (sandbox buyer account or test card).
+3. `POST /api/orders/paypal/:paypalOrderId/capture` captures the payment, checks the captured amount matches the order, confirms the order, clears the cart and emails the customer. A declined funding source returns `402` and leaves the order open so the buyer can pick another method.
+4. `POST /api/orders/paypal/:paypalOrderId/cancel` (buyer closed the popup) releases the stock.
+
+Unpaid PayPal orders are hidden from vendors and excluded from revenue. A job every 10 minutes releases checkouts abandoned for 30 minutes — or confirms them if PayPal shows they were paid. Cancelling a paid PayPal order issues a real sandbox **refund** through PayPal. `GET /api/payments/config` tells the frontend whether PayPal is available (the client ID is public by design; the secret never leaves the server).
+
+PayPal shows the store as **PawMart** and uses the shipping address entered at checkout.
+
+**Getting sandbox credentials:** sign in at [developer.paypal.com](https://developer.paypal.com) → **Apps & Credentials** → **Sandbox** → create an app → copy the **Client ID** and **Secret** into `.env`. Under **Testing Tools → Sandbox Accounts** PayPal creates a *personal* (buyer) account — use its email and password in the PayPal popup — and a *business* account that receives the test payments.
+
+> **Use a United States sandbox business account.** If the app is linked to a business account registered in Sri Lanka, PayPal refuses payments to it (`PAYEE_ACCOUNT_RESTRICTED` / "Things don't seem to be going well") and card payments fail with `PAYEE_NOT_ENABLED_FOR_CARD_PROCESSING` — PayPal accounts in Sri Lanka can't receive money. Create a US business sandbox account and a new app linked to it. Log in to the popup with the **personal** account, never the business one.
 
 ### Email notifications
 
@@ -334,6 +356,10 @@ Auth: ✗ public · ✓ any signed-in user · **V** vendor · **SP** service pro
 | GET | `/api/orders` | ✓ | My orders |
 | GET | `/api/orders/:id` | ✓ | One of my orders |
 | POST | `/api/orders/:id/cancel` | ✓ | Cancel before shipping |
+| POST | `/api/orders/paypal` | ✓ | Start a PayPal checkout `{ shippingAddress }` → `{ orderId, paypalOrderId }` |
+| POST | `/api/orders/paypal/:paypalOrderId/capture` | ✓ | Capture after the buyer approves |
+| POST | `/api/orders/paypal/:paypalOrderId/cancel` | ✓ | Release a PayPal checkout the buyer cancelled |
+| GET | `/api/payments/config` | ✗ | Payment options (PayPal enabled, public client ID, currency) |
 | GET | `/api/pets` | ✓ | My pets, each with a vaccination summary |
 | POST | `/api/pets` | ✓ | Create a pet |
 | GET | `/api/pets/:id` | ✓ | Pet + health record (vaccinations annotated with status) |
@@ -392,7 +418,7 @@ Auth: ✗ public · ✓ any signed-in user · **V** vendor · **SP** service pro
 | **Review** | `productId`, `userId` (unique together), `userName`, `rating` (1–5), `comment` |
 | **Cart** | `userId` (unique — one cart per user), `items: [{ product, quantity }]` |
 | **Order** | `userId`, `items: [{ product, vendorId, name, priceCents, quantity, status }]`, `subtotalCents`, `taxCents`, `shippingCents`, `totalCents`, `status`, `statusHistory[]`, `shippingAddress`, `paymentMethod`, `paymentId` |
-| **Payment** | `userId`, `orderId` (null for failed attempts), `method`, `amountCents`, `status` (`pending` \| `succeeded` \| `failed` \| `refunded` \| `cancelled`), `card: { brand, last4, expMonth, expYear }`, `transactionRef`, `failureCode` |
+| **Payment** | `userId`, `orderId` (null for failed attempts), `method` (`credit_card` \| `cash_on_delivery` \| `paypal`), `amountCents`, `status` (`pending` \| `succeeded` \| `failed` \| `refunded` \| `cancelled`), `card: { brand, last4, expMonth, expYear }`, `transactionRef` (simulated ref or PayPal capture ID), `providerOrderId` (PayPal order ID), `payerEmail`, `refundRef`, `failureCode` |
 | **VendorApplication** | `userId`, `businessName`, `businessType`, `status`, `reviewedBy`, `reviewedAt` |
 | **Service** | `name`, `type` (`vet` \| `grooming`), `durationMinutes`, `priceCents`, `providerId` (null = PawMart Clinic), `timeSlots[]`, `availableDays[]`, `active` |
 | **Appointment** | `userId`, `service`, `petId`, `petDescription`, `scheduledAt`, `timeSlotLabel`, `notes`, `status` (`booked` \| `completed` \| `no_show` \| `cancelled`), `cancelledBy`, `cancelReason` |
@@ -421,7 +447,8 @@ All errors — thrown `ApiError`s, Mongoose validation errors, invalid ObjectId 
 | 409 | `CONFLICT` | Duplicate email, insufficient stock, unavailable cart item, slot already booked, invalid status change |
 | 429 | `RATE_LIMITED` | Too many requests |
 | 500 | `INTERNAL_ERROR` | Unhandled server error |
-| 503 | `UPLOADS_DISABLED` | Upload signature requested but Cloudinary isn't configured |
+| 502 | `PAYPAL_ERROR` / `PAYPAL_UNAVAILABLE` / `PAYPAL_REFUND_FAILED` | PayPal rejected a request or couldn't be reached (check the PayPal credentials) |
+| 503 | `UPLOADS_DISABLED` / `PAYPAL_DISABLED` | Feature requested but not configured on this server |
 
 ## Security
 
@@ -464,7 +491,10 @@ There is no deployment configuration (Dockerfile, CI/CD, hosting-specific config
 | `401 Unauthorized` on a route you just logged in for | Token wasn't sent (`Authorization: Bearer <token>` header), has expired (1-day lifetime), or the user's `tokenVersion` changed since the token was issued |
 | CORS error in the browser console | `FRONTEND_URL` in `.env` doesn't match the origin the frontend is actually running on |
 | `409 CONFLICT` on checkout | A cart item's quantity exceeds current stock, or an item was hidden/its seller suspended — the message names the item |
-| `402 PAYMENT_DECLINED` on checkout | A simulated decline test card was used — try `4242 4242 4242 4242` |
+| `402 PAYMENT_DECLINED` on checkout | A simulated decline test card was used — try `4242 4242 4242 4242` (for PayPal, the sandbox funding source was declined; choose another in the popup) |
+| No PayPal option at checkout | `PAYPAL_CLIENT_ID`/`PAYPAL_CLIENT_SECRET` aren't set — the startup log says `[paypal] not configured` |
+| PayPal popup shows "Things don't seem to be going well" | The app's sandbox business (seller) account can't receive payments (e.g. registered in Sri Lanka), or you logged in with the business account — use a US business account for the app and the personal account in the popup |
+| PayPal popup says the client ID is invalid | The Client ID/Secret are from a **live** app while `PAYPAL_ENV=sandbox` (or vice versa) |
 | No emails arrive | `SMTP_HOST` isn't set (emails are printed in the server console), or the SMTP credentials are wrong — the startup log says which |
 | Upload button missing, only an image-URL field | Cloudinary variables aren't set (`GET /api/uploads/config` returns `enabled: false`) |
 | Appointment times look 5½ hours off | `APP_UTC_OFFSET` doesn't match where your customers are (default `+05:30`) |

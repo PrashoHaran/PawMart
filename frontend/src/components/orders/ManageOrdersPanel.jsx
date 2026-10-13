@@ -6,6 +6,7 @@ import { FULFILMENT_FLOW, ORDER_STATUS, nextStatus, orderNumber, paymentSummary 
 
 const PAGE_SIZE = 10;
 const FILTERS = ['', ...FULFILMENT_FLOW, 'cancelled'];
+const ADMIN_FILTERS = ['', 'pending', ...FULFILMENT_FLOW, 'cancelled'];
 
 // The status the given items can move to next (based on the least advanced).
 function nextFor(items) {
@@ -18,7 +19,8 @@ function nextFor(items) {
 function OrderRow({ order, mode, busy, onAdvance, onCancel }) {
   const [open, setOpen] = useState(false);
   const status = ORDER_STATUS[order.status] ?? ORDER_STATUS.confirmed;
-  const next = nextFor(order.items);
+  // Unpaid PayPal orders can't be fulfilled until payment completes.
+  const next = order.status === 'pending' ? null : nextFor(order.items);
   const payment = paymentSummary(order);
   const amount = mode === 'vendor' ? order.vendorSubtotalCents : order.totalCents;
   const address = order.shippingAddress;
@@ -173,7 +175,7 @@ export default function ManageOrdersPanel({ mode, onChanged }) {
               setPage(1);
             }}
           >
-            {FILTERS.map((f) => (
+            {(mode === 'admin' ? ADMIN_FILTERS : FILTERS).map((f) => (
               <option key={f || 'all'} value={f}>{f ? ORDER_STATUS[f].label : 'All'}</option>
             ))}
           </select>
